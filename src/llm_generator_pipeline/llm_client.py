@@ -1,6 +1,7 @@
 import ollama
 import time
 import json
+import re
 
 def call_ollama(
     prompt: str,
@@ -29,13 +30,17 @@ def parse_json_response(response: str) -> dict:
     Raises ValueError on malformed JSON after stripping.
     """
     response = response.strip()
-    if response.startswith("```"):
+    if "```" in response:
         parts = response.split("```")
-        if len(parts) >= 2:
-            response = parts[1]
-            if response.startswith("json"):
-                response = response[4:]
-            response = response.strip()
+        for part in parts:
+            part = part.strip()
+            if part.startswith("{") and part.endswith("}"):
+                return json.loads(part)
+    
+    match = re.search(r"\{.*\}", response, re.DOTALL)
+    if match:
+        return json.loads(match.group())
 
-    return json.loads(response)
+    raise ValueError("No valid JSON found in LLM response")
+
 
