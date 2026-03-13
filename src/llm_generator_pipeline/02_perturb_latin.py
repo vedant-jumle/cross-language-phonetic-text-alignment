@@ -87,19 +87,21 @@ def main(config_path):
                         out.write(json.dumps(output, ensure_ascii=False) + "\n")
                 out.flush()
                 batch = []
-            if batch:
-                data = process_batch(batch, config)
-                if data:
-                    for r in batch:
-                        variants = data.get(r["name_en"], [])
+        if batch:
+            data = process_batch(batch, config)
+            if data:
+                for r in batch:
+                    variants = data.get(r["name_en"], [])
+                    if r["name_en"] not in data:
+                        print("Missing key:", r["name_en"], file=sys.stderr)
                     output = {
-                        "entity_id": r["entity_id"],
-                        "name_en": r["name_en"],
-                        "wikidata": r["wikidata"],
-                        "latin_variants": variants
-                    }
+                            "entity_id": r["entity_id"],
+                            "name_en": r["name_en"],
+                            "wikidata": r["wikidata"],
+                            "latin_variants": variants
+                        }
                     out.write(json.dumps(output, ensure_ascii=False) + "\n")
-                out.flush()
+            out.flush()
 
 if __name__ == "__main__":
 
