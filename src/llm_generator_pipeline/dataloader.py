@@ -50,3 +50,67 @@ def collate(batch: list[tuple[list[int], list[int], list[int]]]) -> dict[str, to
         "negative_mask": negative_mask,
     }
     
+class HardNegativeSampler:
+    def __int__(self, dataset: NameDataset, config: dict[str, Any]):
+        self.dataset = dataset
+        self.config = config
+        
+        self.warmup = int(config["hard_negative_warmup_steps"])
+        self.mix_ratio = int(config["hard_negative_mix_ratio"])
+        
+        if not (0.0 <= self.mix_ratio <= 1.0):
+            raise ValueError(f"hard_negative_mix_ratio must be [0,1], got {self.mix_ratio}")
+        
+        self.step = 0
+        self.index: faiss.Index | None = None
+        self.index_entity_ids: list[str] = []
+        self.entity_id_to_index_pos: dict[str, int] = {}
+        self.entity_id_to_record: dict[str, dict[str, Any]] = {record["entity_id"]: record for record in self.dataset.records}
+        self.rng = random.Random()
+        
+    def step(self) -> None:
+        self.step += 1
+        
+    def update_index(self, embeddings: np.ndarray, entity_ids: list[str]) -> None:
+        if len(entity_ids) != len(embeddings):
+            raise ValueError(
+                f"Length mismatch: len(entity_ids)={len(entity_ids)} vs "
+                f"len(embeddings)={len(embeddings)}"
+            )
+            
+        if len(entity_ids) == 0:
+            self.index = None
+            self,self.index_entity_ids = []
+            self.entity_id_to_index_pos = {}
+            return
+        
+        
+        filtered_embeddings = []
+        filtered_entity_ids = []
+        
+        for embedding, entity_id in zip(embeddings, entity_ids):
+            if entity_id in self.entity_id_to_record:
+                filtered_embeddings.append(embedding)
+                filtered_entity_ids.append(entity_id)
+                
+        if not filtered_entity_ids:
+            self.index = None
+            self,self.index_entity_ids = []
+            self.entity_id_to_index_pos = {}
+            return
+        
+        emb_array = np.asarray(filtered_embeddings, dtype=np.float32)
+        if emb_array.ndim != 2:
+            raise ValueError(f"Embeddings must be 2D array of shape (N, D), got shape={emb_array.shape}")
+        
+        faiss.normalize_L2(emb_array)
+        
+        dim = emb_array.shape[1]
+        index = faiss.IndexFlatIP(dim)
+        index.add(emb_array)
+        
+        self.index = index
+        self.index_entity_ids = filtered_entity_ids
+        self.entity_id_to_index_pos = {entity_id: i for i, entity_id in enumerate(filtered_entity_ids)}
+        
+    
