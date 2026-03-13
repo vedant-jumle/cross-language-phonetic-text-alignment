@@ -36,11 +36,9 @@ def parse_json_response(response: str) -> dict:
             part = part.strip()
             if part.startswith("{") and part.endswith("}"):
                 return json.loads(part)
-    
     match = re.search(r"\{.*\}", response, re.DOTALL)
     if match:
         return json.loads(match.group())
-
     raise ValueError("No valid JSON found in LLM response")
 
 
