@@ -54,19 +54,18 @@ def merge_wikidata_record(record: dict, config: dict) -> dict:
                 "source": "wikidata"
             })
 
-    seen_texts = set()
+    seen_texts = {}
     deduped = []
     for p in positives:
         key = p["text"].strip().lower()
         if key not in seen_texts:
             deduped.append(p)
-            seen_texts.add(key)
+            seen_texts[key] = len(deduped) - 1
         else:
             if p["source"] == "wikidata":
-                for i, old in enumerate(deduped):
-                    if old["text"].strip().lower() == key:
-                        deduped[i] = p
-                        break
+                idx = seen_texts[key]
+                deduped[idx] = p
+
     positives = deduped
     split = assign_split(record["entity_id"], config["split_train"], config["split_val"])
     return {
