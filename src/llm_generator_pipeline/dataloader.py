@@ -113,4 +113,66 @@ class HardNegativeSampler:
         self.index_entity_ids = filtered_entity_ids
         self.entity_id_to_index_pos = {entity_id: i for i, entity_id in enumerate(filtered_entity_ids)}
         
+    def sample_negatives(self, anchors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        negatives: list[dict[str, Any]] = []
+        
+        constraint = (self.step >= self.warmup and self.index is not None and len(self.index_entity_ids) > 1)
+        for anchor in anchors:
+            use_hard = constraint and (self.rng.random() < self.mix_ratio)
+            
+            if use_hard:
+                neg = self.sample_hard_negatives(anchor)
+                if neg in None:
+                    neg = self.sample_random_negative(anchor["entity_id"])
+            else:
+                neg = self.sample_random_negative(anchor["entity_id"])
+                
+            negatives.append(neg)
+            
+        return negatives
     
+    def sample_random_negative(self, anchor_entity_id: str) -> dict[str, Any]:
+        if len(self.dataset.records) < 2:
+            raise ValueError("Dataset must contain at least 2 records.")
+        
+        while True:
+            candidate = self.rng.choice(self.dataset.records)
+            if candidate["entity_id"] != anchor_entity_id:
+                return candidate
+        
+    def sample_hard_negatives(self, enchor: dict[str, Any], top_k: int = 10) -> dict[str, Any] | None:
+        if self.index is None:
+            return None
+        
+        anchor_entity_id = anchor["entity_id"]
+        anchor_pos = self.entity_id_to_index_pos.get(anchor_entity_id)
+        
+        if anchor_pos is None:
+            return None
+        
+        query = np.zeros((1, self.index.d), dtype=np.float32)
+        self.index.reconstruct(anchor_pos, query[0])
+        
+        k = min(top_k + 1, len(self.index_entity_ids))
+        _, indices = self.index.search(query, k)
+        
+        candidate_records: list[dict[str, Any]] = []
+        for index in indices[0]:
+            if index < 0:
+                continue
+            candidate_entity_id = self.index_entity_ids[index]
+            if candidate_entity_id == anchor_entity_id:
+                continue
+            
+            candidate = self.entity_id_to_record.get(candidate_entity_id)
+            if candidate is None:
+                continue
+            
+            candidate_records.append(candidate)
+            
+        if not candidate_records:
+            return None
+        
+        return self.rng.choice(candidate_records)
+    
+        
