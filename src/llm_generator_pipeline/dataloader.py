@@ -95,7 +95,7 @@ class HardNegativeSampler:
                 
         if not filtered_entity_ids:
             self.index = None
-            self,self.index_entity_ids = []
+            self.index_entity_ids = []
             self.entity_id_to_index_pos = {}
             return
         
