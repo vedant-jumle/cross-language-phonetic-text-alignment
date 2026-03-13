@@ -1,0 +1,44 @@
+# defines all confguration parameters for the pipeline
+# every other scripts loads this file
+# no hardcoded values anywhere in the pipeline
+
+# required keys
+
+---
+
+# sampling
+# how many names to sample from names.csv
+sample_size: 50000
+# for reproducibility
+sample_seed: 42
+  
+# LLM
+# Ollama model name, any valid model string
+llm_model: "llama3.2:1b"     
+llm_base_url: "http://localhost:11434"
+# names per llm prompt call
+batch_size: 20
+
+# perturbation
+# phonetic Latin variants per name (phase 1)
+n_perturbations: 4
+# scripts to translitereate into (phase 2)
+target_scripts:
+  - ar
+  - ru
+  - zh
+  - ja
+  - he
+  - hi
+  - el
+  - ko
+
+# dataset splits
+# how to split the dataset into train/val/test
+split_train: 0.8
+split_val: 0.1
+split_test: 0.1
+
+# hard negative mining 
+hard_negative_warmup_steps: 1000
+hard_negative_mix_ratio: 0.5
