@@ -13,7 +13,7 @@ class NameDataset(Dataset):
         if split not in SPLITS:
             raise ValueError(f"Invalid split: {split}!")
         
-        self.path = path
+        self.path = Path(path)
         
         if not self.path.exists():
             raise FileNotFoundError(f"Can't find path: {path}")
@@ -57,7 +57,7 @@ class NameDataset(Dataset):
         if not isinstance(record["entity_id"], str):
             raise ValueError(f"'entity_id' must be a str on line {line_num}.")
         if record["split"] not in SPLITS:
-            raise ValueError(f"Invalid split {record["split"]} on line {line_num}.")
+            raise ValueError(f"Invalid split {record['split']} on line {line_num}.")
         
         anchor = record["anchor"]
         if not isinstance(anchor, dict):

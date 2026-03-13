@@ -56,12 +56,12 @@ class HardNegativeSampler:
         self.config = config
         
         self.warmup = int(config["hard_negative_warmup_steps"])
-        self.mix_ratio = int(config["hard_negative_mix_ratio"])
+        self.mix_ratio = float(config["hard_negative_mix_ratio"])
         
         if not (0.0 <= self.mix_ratio <= 1.0):
             raise ValueError(f"hard_negative_mix_ratio must be [0,1], got {self.mix_ratio}")
         
-        self.step = 0
+        self._step = 0
         self.index: faiss.Index | None = None
         self.index_entity_ids: list[str] = []
         self.entity_id_to_index_pos: dict[str, int] = {}
@@ -69,7 +69,7 @@ class HardNegativeSampler:
         self.rng = random.Random()
         
     def step(self) -> None:
-        self.step += 1
+        self._step += 1
         
     def update_index(self, embeddings: np.ndarray, entity_ids: list[str]) -> None:
         if len(entity_ids) != len(embeddings):
@@ -80,7 +80,7 @@ class HardNegativeSampler:
             
         if len(entity_ids) == 0:
             self.index = None
-            self,self.index_entity_ids = []
+            self.index_entity_ids = []
             self.entity_id_to_index_pos = {}
             return
         
@@ -116,13 +116,13 @@ class HardNegativeSampler:
     def sample_negatives(self, anchors: list[dict[str, Any]]) -> list[dict[str, Any]]:
         negatives: list[dict[str, Any]] = []
         
-        constraint = (self.step >= self.warmup and self.index is not None and len(self.index_entity_ids) > 1)
+        constraint = (self._step >= self.warmup and self.index is not None and len(self.index_entity_ids) > 1)
         for anchor in anchors:
             use_hard = constraint and (self.rng.random() < self.mix_ratio)
             
             if use_hard:
                 neg = self.sample_hard_negatives(anchor)
-                if neg in None:
+                if neg is None:
                     neg = self.sample_random_negative(anchor["entity_id"])
             else:
                 neg = self.sample_random_negative(anchor["entity_id"])
@@ -178,11 +178,11 @@ class HardNegativeSampler:
 def choose_positive_bytes(record: dict[str, Any], rng: random.Random) -> list[int]:
     positives = record.get("positives", [])
     
-    if positives:
-        chosen = rng.choice(positives)
-        return chosen["bytes"]
+    if len(positives) == 0:
+        return record["anchor"]["bytes"]   
 
-    return record["anchor"]["bytes"]    
+    chosen = rng.choice(positives)
+    return chosen["bytes"]
 
 def build_dataloader(dataset: NameDataset, sampler: HardNegativeSampler, config: dict[str, Any], shuffle: bool = True) -> DataLoader:
     batch_size = int(config["batch_size"])
@@ -198,6 +198,7 @@ def build_dataloader(dataset: NameDataset, sampler: HardNegativeSampler, config:
             negative_bytes = negative_record["anchor"]["bytes"]
             
             triplets.append((anchor_bytes, positive_bytes, negative_bytes))
+        return collate_fn(triplets)
             
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0, collate_fn=triplet_collate)
         
