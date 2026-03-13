@@ -29,7 +29,7 @@ def pad_sequences(sequences: list[list[int]], pad_value: int = 0) -> tuple[torch
         
     return padded, mask
 
-def collate(batch: list[tuple[list[int], list[int], list[int]]]) -> dict[str, torch.Tensor]:
+def collate_fn(batch: list[tuple[list[int], list[int], list[int]]]) -> dict[str, torch.Tensor]:
     if not batch:
         raise ValueError("Received empty batch.")
     
@@ -51,7 +51,7 @@ def collate(batch: list[tuple[list[int], list[int], list[int]]]) -> dict[str, to
     }
     
 class HardNegativeSampler:
-    def __int__(self, dataset: NameDataset, config: dict[str, Any]):
+    def __init__(self, dataset: NameDataset, config: dict[str, Any]):
         self.dataset = dataset
         self.config = config
         
@@ -140,7 +140,7 @@ class HardNegativeSampler:
             if candidate["entity_id"] != anchor_entity_id:
                 return candidate
         
-    def sample_hard_negatives(self, enchor: dict[str, Any], top_k: int = 10) -> dict[str, Any] | None:
+    def sample_hard_negatives(self, anchor: dict[str, Any], top_k: int = 10) -> dict[str, Any] | None:
         if self.index is None:
             return None
         
@@ -175,4 +175,29 @@ class HardNegativeSampler:
         
         return self.rng.choice(candidate_records)
     
+def choose_positive_bytes(record: dict[str, Any], rng: random.Random) -> list[int]:
+    positives = record.get("positives", [])
+    
+    if positives:
+        chosen = rng.choice(positives)
+        return chosen["bytes"]
+
+    return record["anchor"]["bytes"]    
+
+def build_dataloader(dataset: NameDataset, sampler: HardNegativeSampler, config: dict[str, Any], shuffle: bool = True) -> DataLoader:
+    batch_size = int(config["batch_size"])
+    rng = random.Random()
+    
+    def triplet_collate(records: list[dict[str, Any]]) -> dict[str, torch.Tensor]:
+        negatives = sampler.sample_negatives(records)
+        
+        triplets: list[tuple[list[int], list[int], list[int]]] = []
+        for anchor_record, negative_record in zip(records, negatives):
+            anchor_bytes = anchor_record["anchor"]["bytes"]
+            positive_bytes = choose_positive_bytes(anchor_record, rng)
+            negative_bytes = negative_record["anchor"]["bytes"]
+            
+            triplets.append((anchor_bytes, positive_bytes, negative_bytes))
+            
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=0, collate_fn=triplet_collate)
         
