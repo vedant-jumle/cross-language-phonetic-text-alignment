@@ -74,7 +74,7 @@ class NameDataset(Dataset):
             raise ValueError(f"'positives' must be a list on line {line_num}.")
         
         for i, pos in enumerate(positives):
-            if not isinstance(pos dict):
+            if not isinstance(pos, dict):
                 raise ValueError(f"'positives[{i}]' must be a dict on line {line_num}.")
             
             required_pos = {"text", "bytes", "type", "source"}
