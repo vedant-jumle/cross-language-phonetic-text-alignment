@@ -1,53 +1,47 @@
 import pandas as pd
-import yaml
 import json
 import os
-import sys
 import argparse
+
+from llm_generator_pipeline.config import load_config
 
 
 # INPUT_COLUMNS = ['entity_id', 'name_en', 'name_ru', 'name_ar', 'name_zh', 'name_ja', 'name_he', 'name_hi', 'name_el', 'name_ko']
 
 SCRIPT_COLUMNS = ['name_ru', 'name_ar', 'name_zh', 'name_ja', 'name_he', 'name_hi', 'name_el', 'name_ko']
-REQUIRED_KEYS = ["sample_size", "sample_seed", "llm_model", "llm_base_url", "batch_size", "n_perturbations", "target_scripts", "split_train", "split_val", "split_test", "hard_negative_warmup_steps", "hard_negative_mix_ratio"]
 
 
-def load_config(config_path):
-    with open(config_path, "rt", encoding="utf-8") as config_file:
-        config = yaml.safe_load(config_file)
-    if not all(key in config for key in REQUIRED_KEYS):
-            print("error: missing required keys in the config file, please ensure all of the keys are present:", REQUIRED_KEYS)
-            sys.exit(1)
-    return config
+
 
 def load_data(dataset_path):
     if not os.path.exists(dataset_path):
-        print( f"File {dataset_path} not found" )
-        sys.exit(1)
+        raise FileNotFoundError(f"Dataset file {dataset_path} not found")
     data = pd.read_csv(dataset_path, dtype=str).fillna("")
     return data
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="config.yaml", help="path to the config file")
-    args = parser.parse_args()
-    DATASET_PATH = "data/names.csv"
-    data = load_data(DATASET_PATH)
-    if (data["name_en"].astype(str).str.strip() == "").any():
-        print("error: name.csv has empty values in the name_en column")
-        sys.exit(1)
-        # data = data[data["name_en"].astype(str).str.strip() != ""].copy()
-    # we always want to have name en so filter out the empty values
-    data['bucket'] = data.apply(create_bucket, axis=1)
+    try:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--config", type=str, default="config.yaml", help="path to the config file")
+        parser.add_argument("--input", type=str, default="data/names.csv", help="path to the names.csv")
 
-    config = load_config(args.config)
-    sample_size = config["sample_size"]
-    sample_seed = config["sample_seed"]
+        args = parser.parse_args()
 
-    stratified_df = stratified_sample(data, sample_size, sample_seed)
-    write_to_jsonl(stratified_df)
-    print(f"sucessfully created a stratified sample of size {len(stratified_df)} and saved it to data/pipeline/01_sampled.jsonl")
+        data = load_data(args.input)
+        data["name_en"] = data["name_en"].astype(str).str.strip()
+        data = data[data["name_en"] != ""].copy()
+        # we always want to have name en so filter out the empty values
+        data['bucket'] = data.apply(create_bucket, axis=1)
 
+        config = load_config(args.config)
+        sample_size = config["sample_size"]
+        sample_seed = config["sample_seed"]
+
+        stratified_df = stratified_sample(data, sample_size, sample_seed)
+        write_to_jsonl(stratified_df)
+        print(f"sucessfully created a stratified sample of size {len(stratified_df)} and saved it to data/pipeline/01_sampled.jsonl")
+    except Exception as e:
+        raise RuntimeError(f"Error in 01_sample.py: {e}")
 
 def create_bucket(row):
     coverage_score = sum(bool(str(row[col]).strip()) for col in SCRIPT_COLUMNS)
