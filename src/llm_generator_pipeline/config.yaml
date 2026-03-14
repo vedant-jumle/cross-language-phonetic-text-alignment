@@ -8,16 +8,23 @@
 
 # sampling
 # how many names to sample from names.csv
-sample_size: 50000
+sample_size: 1000000
 # for reproducibility
 sample_seed: 42
-  
-# LLM
-# Ollama model name, any valid model string
-llm_model: "llama3.2:1b"     
-llm_base_url: "http://localhost:11434"
-# names per llm prompt call
-batch_size: 20
+
+# LLM (local HF inference)
+# On HPC: set to local path after running scripts/download_model.py
+# e.g. /scratch/vvjumle/models/Llama-3.1-8B-Instruct
+# Locally: use HF model ID to auto-download
+hf_model_id: "/scratch/vvjumle/models/Llama-3.1-8B-Instruct"
+# names per model.generate() call (32 works well on V100 16GB with 8B model)
+batch_size: 32
+
+# Anthropic Batch API (02_perturb_combined.py)
+# leave anthropic_api_key blank to use ANTHROPIC_API_KEY env var
+anthropic_api_key: ""
+# cap number of names to process (null = all)
+max_names: 100000
 
 # perturbation
 # phonetic Latin variants per name (phase 1)

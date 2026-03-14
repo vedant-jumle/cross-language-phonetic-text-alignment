@@ -207,3 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 data/raw/
+data/pipeline/
+
+# Test/scratch scripts
+prompt_test.py
+token_count_test.py

@@ -1,8 +1,12 @@
 import pandas as pd
 import json
 import os
+import sys
 import argparse
+from pathlib import Path
+from tqdm.auto import tqdm
 
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 from llm_generator_pipeline.config import load_config
 
 
@@ -27,11 +31,14 @@ def main():
 
         args = parser.parse_args()
 
+        tqdm.write("Loading dataset...")
         data = load_data(args.input)
+        tqdm.write(f"Loaded {len(data):,} rows. Filtering and bucketing...")
         data["name_en"] = data["name_en"].astype(str).str.strip()
         data = data[data["name_en"] != ""].copy()
         # we always want to have name en so filter out the empty values
-        data['bucket'] = data.apply(create_bucket, axis=1)
+        tqdm.pandas(desc="Assigning buckets")
+        data['bucket'] = data.progress_apply(create_bucket, axis=1)
 
         config = load_config(args.config)
         sample_size = config["sample_size"]
@@ -140,7 +147,7 @@ def write_to_jsonl(results):
 #   }
     os.makedirs("data/pipeline", exist_ok=True)
     with open("data/pipeline/01_sampled.jsonl", "w", encoding="utf-8") as f:
-        for _, row in results.iterrows():
+        for _, row in tqdm(results.iterrows(), total=len(results), desc="Writing sampled records"):
             entry = {
                 "entity_id": str(row['entity_id']).strip(),
                 "name_en": str(row['name_en']).strip(),

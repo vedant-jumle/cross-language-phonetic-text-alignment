@@ -1,6 +1,6 @@
 import yaml
 
-REQUIRED_KEYS = ["sample_size", "sample_seed", "llm_model", "llm_base_url", "batch_size", "n_perturbations", "target_scripts", "split_train", "split_val", "split_test", "hard_negative_warmup_steps", "hard_negative_mix_ratio"]
+REQUIRED_KEYS = ["sample_size", "sample_seed", "hf_model_id", "batch_size", "n_perturbations", "target_scripts", "split_train", "split_val", "split_test", "hard_negative_warmup_steps", "hard_negative_mix_ratio"]
 
 def load_config(config_path):
     with open(config_path, "rt", encoding="utf-8") as config_file:
