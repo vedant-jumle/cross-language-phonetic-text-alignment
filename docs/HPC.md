@@ -1,6 +1,6 @@
 # Running the Pipeline on DelftBlue HPC
 
-Runs stages 02→03→04 using Llama 3.1 8B on a V100 GPU for 100k names.
+Runs stages 02→03→04 using Llama 3.1 70B across 4× V100S 32GB GPUs for 100k names.
 
 ## Prerequisites
 
@@ -41,7 +41,7 @@ huggingface-cli login   # paste your HF token when prompted
 python /scratch/vvjumle/ir-pipeline/scripts/download_model.py
 ```
 
-This downloads ~16GB to `/scratch/vvjumle/models/Llama-3.1-8B-Instruct/`. Takes ~10 minutes on the login node.
+This downloads ~140GB to `/scratch/vvjumle/models/Llama-3.1-70B-Instruct/`. Takes ~30-60 minutes on the login node.
 
 ---
 
@@ -67,7 +67,7 @@ tail -f /scratch/vvjumle/logs/ir_pipeline_<jobid>.out
 
 ## Troubleshooting
 
-**OOM on V100 (16GB):** Reduce `batch_size` in `config.yaml` from 32 → 16.
+**OOM on V100S (32GB × 4):** Reduce `batch_size` in `config.yaml` from 16 → 8. If still OOM, fall back to `Llama-3.1-8B-Instruct` with `batch_size=64` on a single card.
 
 **Model not found:** Verify the path in `config.yaml` matches where `download_model.py` saved it:
 ```bash

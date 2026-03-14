@@ -3,8 +3,8 @@
 #SBATCH --partition=gpu
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --gpus-per-task=1
+#SBATCH --cpus-per-task=8
+#SBATCH --gpus-per-task=4
 #SBATCH --mem-per-cpu=8G
 #SBATCH --account=Education-EEMCS-Courses-DSAIT4095
 #SBATCH --output=/scratch/vvjumle/logs/ir_pipeline_%j.out

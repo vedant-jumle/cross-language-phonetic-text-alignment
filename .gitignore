@@ -212,3 +212,5 @@ data/pipeline/
 # Test/scratch scripts
 prompt_test.py
 token_count_test.py
+
+data/pipeline/01_sampled.jsonl
