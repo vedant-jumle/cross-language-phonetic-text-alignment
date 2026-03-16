@@ -28,7 +28,7 @@ if ! conda env list | grep -q "^ir-pipeline "; then
     conda env create -f $REPO/environment.yml
 fi
 
-source activate ir-pipeline
+conda activate ir-pipeline
 
 # Make sure data/pipeline points to scratch (symlink)
 ln -sfn $SCRATCH_DATA $REPO/data/pipeline
