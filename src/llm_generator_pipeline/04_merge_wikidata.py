@@ -3,7 +3,7 @@ import hashlib
 from pathlib import Path
 from tqdm.auto import tqdm
 
-INPUT_PATH = "data/pipeline/03_perturbed_scripts.jsonl"
+INPUT_PATH = "data/pipeline/02_perturbed_combined.jsonl"
 OUTPUT_PATH = "data/pipeline/04_dataset.jsonl"
 
 def to_bytes(text: str) -> list[int]:

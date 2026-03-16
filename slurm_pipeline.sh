@@ -20,15 +20,8 @@ mkdir -p $SCRATCH_DATA
 
 module load 2025
 module load miniconda3
-module load cuda/12.9
-
-# Create conda env from environment.yml if it doesn't exist yet
-if ! conda env list | grep -q "^ir-pipeline "; then
-    echo "=== Creating conda environment ir-pipeline ==="
-    conda env create -f $REPO/environment.yml
-fi
-
 conda activate ir-pipeline
+module load cuda/12.9
 
 # Make sure data/pipeline points to scratch (symlink)
 ln -sfn $SCRATCH_DATA $REPO/data/pipeline
