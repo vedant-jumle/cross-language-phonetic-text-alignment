@@ -12,8 +12,8 @@ Downloads Llama-3.1-8B-Instruct to /scratch/vvjumle/models/.
 import os
 from huggingface_hub import snapshot_download
 
-MODEL_ID = "meta-llama/Llama-3.1-70B-Instruct"
-LOCAL_DIR = "/scratch/vvjumle/models/Llama-3.1-70B-Instruct"
+MODEL_ID = "meta-llama/Llama-3.1-8B-Instruct"
+LOCAL_DIR = "/scratch/vvjumle/models/Llama-3.1-8B-Instruct"
 
 os.makedirs(LOCAL_DIR, exist_ok=True)
 print(f"Downloading {MODEL_ID} → {LOCAL_DIR}")
