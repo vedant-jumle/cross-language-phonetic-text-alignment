@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --gpus-per-task=1
-#SBATCH --mem-per-cpu=8G
+#SBATCH --mem-per-cpu=5G
 #SBATCH --account=Education-EEMCS-Courses-DSAIT4095
 #SBATCH --output=/scratch/vvjumle/logs/ir_pipeline_%j.out
 #SBATCH --error=/scratch/vvjumle/logs/ir_pipeline_%j.err
