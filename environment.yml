@@ -1,16 +1,14 @@
 name: ir-pipeline
 channels:
-  - pytorch
-  - nvidia
   - conda-forge
   - defaults
 dependencies:
   - python=3.11
   - pip
   - pip:
-    - torch==2.4.0
-    - transformers>=4.45.0
-    - accelerate>=0.34.0
+    - torch==2.7.0 --index-url https://download.pytorch.org/whl/cu126
+    - transformers==5.3.0
+    - accelerate==1.13.0
     - tqdm>=4.66.0
     - PyYAML>=6.0
     - pandas>=2.0.0
