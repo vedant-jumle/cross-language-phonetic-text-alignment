@@ -15,7 +15,7 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from tqdm import tqdm
 
-from src.llm_generator_pipeline.dataloader import HardNegativeSampler, build_dataloader
+from src.llm_generator_pipeline.dataloader import ANCEBatchSampler, build_infonce_dataloader
 from src.llm_generator_pipeline.dataset import NameDataset
 from src.model.config import ByteEncoderConfig
 from src.model.encode_all import encode_all
@@ -40,8 +40,7 @@ def evaluate(model: ByteLevelEncoder, val_loader, loss_fn, device: str) -> float
         for batch in val_loader:
             anchor   = model(batch["anchor"].to(device),   batch["anchor_mask"].to(device))
             positive = model(batch["positive"].to(device), batch["positive_mask"].to(device))
-            negative = model(batch["negative"].to(device), batch["negative_mask"].to(device))
-            total_loss += loss_fn(anchor, positive, negative).item()
+            total_loss += loss_fn(anchor, positive).item()
             n_batches += 1
     model.train()
     return total_loss / max(1, n_batches)
@@ -95,16 +94,12 @@ def main(config_path: str, resume: bool = False) -> None:
     val_ds   = NameDataset(data_path, "val")
     print(f"Train: {len(train_ds)} | Val: {len(val_ds)}")
 
-    # train_batch_size is separate from batch_size (HF inference)
     train_batch_size = int(config["train_batch_size"])
 
-    train_sampler = HardNegativeSampler(train_ds, config)
-    val_sampler   = HardNegativeSampler(val_ds, config)
-
-    # build_dataloader reads config["batch_size"] — pass a copy with train_batch_size
-    dl_config = {**config, "batch_size": train_batch_size}
-    train_loader = build_dataloader(train_ds, train_sampler, dl_config, shuffle=True)
-    val_loader   = build_dataloader(val_ds,   val_sampler,   dl_config, shuffle=False)
+    train_sampler = ANCEBatchSampler(train_ds, config)
+    val_sampler   = ANCEBatchSampler(val_ds,   config)
+    train_loader  = build_infonce_dataloader(train_ds, train_sampler, config)
+    val_loader    = build_infonce_dataloader(val_ds,   val_sampler,   config)
 
     enc_config = ByteEncoderConfig(
         hidden_dim=int(config["hidden_dim"]),
@@ -145,20 +140,19 @@ def main(config_path: str, resume: bool = False) -> None:
         for batch in pbar:
             anchor   = model(batch["anchor"].to(device),   batch["anchor_mask"].to(device))
             positive = model(batch["positive"].to(device), batch["positive_mask"].to(device))
-            negative = model(batch["negative"].to(device), batch["negative_mask"].to(device))
 
-            loss = loss_fn(anchor, positive, negative)
+            loss = loss_fn(anchor, positive)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
             scheduler.step()
-            train_sampler.step()
 
             loss_val     = loss.item()
             epoch_loss  += loss_val
             global_step += 1
             lr_now       = scheduler.get_last_lr()[0]
-            pbar.set_postfix(loss=f"{loss_val:.4f}", avg=f"{epoch_loss/global_step:.4f}", lr=f"{lr_now:.2e}", step=global_step)
+            mix          = train_sampler._current_mix_ratio()
+            pbar.set_postfix(loss=f"{loss_val:.4f}", avg=f"{epoch_loss/global_step:.4f}", lr=f"{lr_now:.2e}", mix=f"{mix:.2f}", step=global_step)
 
             if global_step % refresh_every == 0:
                 embs, ids = encode_all(model, train_ds, train_batch_size, device)

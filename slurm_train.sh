@@ -30,6 +30,6 @@ cd $REPO
 
 echo "=== Starting training ==="
 PYTHONPATH=$REPO python src/model/train.py \
-    --config src/llm_generator_pipeline/config.yaml
+    --config src/llm_generator_pipeline/config_hpc.yaml
 
 echo "=== Training complete. Checkpoints at /scratch/vvjumle/ir-pipeline/checkpoints/ ==="

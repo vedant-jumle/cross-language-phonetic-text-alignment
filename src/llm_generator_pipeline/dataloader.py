@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import math
 import random
 from typing import Any
 
 import faiss
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Sampler
 
 from .dataset import NameDataset
 
@@ -183,6 +184,146 @@ def choose_positive_bytes(record: dict[str, Any], rng: random.Random) -> list[in
 
     chosen = rng.choice(positives)
     return chosen["bytes"]
+
+class ANCEBatchSampler(Sampler):
+    """
+    Batch sampler for InfoNCE training with ANCE-style hard-negative batch construction.
+
+    During warmup: yields random batches (FAISS index not yet meaningful).
+    After warmup: gradually mixes hard-negative-clustered slots into each batch.
+    Each batch contains n_hard anchors that are nearest neighbors of each other
+    (so InfoNCE sees them as hard negatives in the similarity matrix) plus n_rand
+    randomly sampled anchors.
+
+    mix_ratio ramps linearly from 0 → target over mix_ramp_steps steps after warmup.
+    """
+
+    def __init__(self, dataset: NameDataset, config: dict[str, Any]) -> None:
+        self.dataset = dataset
+        self.batch_size = int(config["train_batch_size"])
+        self.warmup = int(config["hard_negative_warmup_steps"])
+        self.target_mix_ratio = float(config["hard_negative_mix_ratio"])
+        self.mix_ramp_steps = int(config["hard_negative_mix_ramp_steps"])
+        self._step = 0
+        self.index: faiss.Index | None = None
+        self.index_entity_ids: list[str] = []
+        # dataset index position keyed by entity_id
+        self.entity_id_to_ds_pos: dict[str, int] = {
+            r["entity_id"]: i for i, r in enumerate(dataset.records)
+        }
+        self.rng = random.Random()
+
+    def _current_mix_ratio(self) -> float:
+        if self._step < self.warmup or self.index is None:
+            return 0.0
+        steps_past_warmup = self._step - self.warmup
+        return min(self.target_mix_ratio, self.target_mix_ratio * steps_past_warmup / max(1, self.mix_ramp_steps))
+
+    def update_index(self, embeddings: np.ndarray, entity_ids: list[str]) -> None:
+        """Rebuild FAISS index from fresh embeddings. Called from train.py."""
+        if len(entity_ids) == 0:
+            self.index = None
+            self.index_entity_ids = []
+            return
+
+        emb_array = np.asarray(embeddings, dtype=np.float32)
+        faiss.normalize_L2(emb_array)
+        index = faiss.IndexFlatIP(emb_array.shape[1])
+        index.add(emb_array)
+        self.index = index
+        self.index_entity_ids = list(entity_ids)
+
+    def _hard_neighbors(self, faiss_pos: int, k: int, exclude: set[int]) -> list[int]:
+        """Return up to k dataset indices that are nearest neighbors of faiss_pos, excluding `exclude`."""
+        if self.index is None:
+            return []
+        query = np.zeros((1, self.index.d), dtype=np.float32)
+        self.index.reconstruct(faiss_pos, query[0])
+        search_k = min(k + len(exclude) + 1, self.index.ntotal)
+        _, faiss_indices = self.index.search(query, search_k)
+        result = []
+        for fi in faiss_indices[0]:
+            if fi < 0 or fi >= len(self.index_entity_ids):
+                continue
+            eid = self.index_entity_ids[fi]
+            ds_pos = self.entity_id_to_ds_pos.get(eid)
+            if ds_pos is None or ds_pos in exclude:
+                continue
+            result.append(ds_pos)
+            if len(result) >= k:
+                break
+        return result
+
+    def __iter__(self):
+        all_indices = list(range(len(self.dataset)))
+        self.rng.shuffle(all_indices)
+        mix = self._current_mix_ratio()
+        n_hard = int(self.batch_size * mix)
+        n_rand = self.batch_size - n_hard
+
+        if n_hard == 0 or self.index is None:
+            # pure random batches
+            for i in range(0, len(all_indices), self.batch_size):
+                batch = all_indices[i: i + self.batch_size]
+                if batch:
+                    self._step += 1
+                    yield batch
+        else:
+            used: set[int] = set()
+            rand_pool = list(all_indices)
+            self.rng.shuffle(rand_pool)
+
+            for seed_ds_pos in all_indices:
+                if seed_ds_pos in used:
+                    continue
+                # find FAISS position for this seed
+                seed_eid = self.dataset.records[seed_ds_pos]["entity_id"]
+                try:
+                    faiss_pos = self.index_entity_ids.index(seed_eid)
+                except ValueError:
+                    faiss_pos = None
+
+                if faiss_pos is not None:
+                    hard_slots = [seed_ds_pos] + self._hard_neighbors(faiss_pos, n_hard - 1, used | {seed_ds_pos})
+                else:
+                    hard_slots = [seed_ds_pos]
+
+                # pad hard slots with random if not enough neighbors
+                remaining_hard = n_hard - len(hard_slots)
+                if remaining_hard > 0:
+                    extras = [i for i in rand_pool if i not in used and i not in hard_slots]
+                    hard_slots += extras[:remaining_hard]
+
+                rand_slots = [i for i in rand_pool if i not in used and i not in hard_slots][:n_rand]
+
+                batch = hard_slots + rand_slots
+                if not batch:
+                    continue
+                used.update(batch)
+                self._step += 1
+                yield batch
+
+    def __len__(self) -> int:
+        return math.ceil(len(self.dataset) / self.batch_size)
+
+
+def pair_collate(records: list[dict[str, Any]]) -> dict[str, torch.Tensor]:
+    rng = random.Random()
+    anchor_seqs   = [r["anchor"]["bytes"] for r in records]
+    positive_seqs = [choose_positive_bytes(r, rng) for r in records]
+    anchor, anchor_mask     = pad_sequences(anchor_seqs,   pad_value=0)
+    positive, positive_mask = pad_sequences(positive_seqs, pad_value=0)
+    return {
+        "anchor":        anchor,
+        "positive":      positive,
+        "anchor_mask":   anchor_mask,
+        "positive_mask": positive_mask,
+    }
+
+
+def build_infonce_dataloader(dataset: NameDataset, sampler: ANCEBatchSampler, config: dict[str, Any]) -> DataLoader:
+    return DataLoader(dataset, batch_sampler=sampler, num_workers=0, collate_fn=pair_collate)
+
 
 def build_dataloader(dataset: NameDataset, sampler: HardNegativeSampler, config: dict[str, Any], shuffle: bool = True) -> DataLoader:
     batch_size = int(config["batch_size"])

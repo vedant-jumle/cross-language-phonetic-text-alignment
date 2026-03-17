@@ -50,7 +50,8 @@ split_test: 0.1
 
 # hard negative mining
 hard_negative_warmup_steps: 200
-hard_negative_mix_ratio: 0.5
+hard_negative_mix_ratio: 0.7
+hard_negative_mix_ramp_steps: 500
 
 # model architecture
 hidden_dim: 256
@@ -73,6 +74,6 @@ lr: 3e-4
 epochs: 20
 warmup_steps: 500
 weight_decay: 0.01
-refresh_every: 1000   # steps between FAISS hard-negative index rebuilds
-eval_every: 500       # steps between val loss evaluations
-checkpoint_dir: "/scratch/vvjumle/ir-pipeline/checkpoints/"
+refresh_every: 200    # steps between FAISS hard-negative index rebuilds
+eval_every: 91        # once per epoch
+checkpoint_dir: "checkpoints/"
