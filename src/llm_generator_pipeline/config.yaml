@@ -49,7 +49,7 @@ split_val: 0.1
 split_test: 0.1
 
 # hard negative mining
-hard_negative_warmup_steps: 1000
+hard_negative_warmup_steps: 200
 hard_negative_mix_ratio: 0.5
 
 # model architecture
