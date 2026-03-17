@@ -8,16 +8,25 @@
 
 # sampling
 # how many names to sample from names.csv
-sample_size: 50000
+sample_size: 1000000
 # for reproducibility
 sample_seed: 42
-  
-# LLM
-# Ollama model name, any valid model string
-llm_model: "llama3.2:1b"     
-llm_base_url: "http://localhost:11434"
-# names per llm prompt call
-batch_size: 20
+
+# LLM (local HF inference)
+# On HPC: set to local path after running scripts/download_model.py
+# e.g. /scratch/vvjumle/models/Llama-3.1-8B-Instruct
+# Locally: use HF model ID to auto-download
+hf_model_id: "/scratch/vvjumle/models/Llama-3.1-8B-Instruct"
+# names per model.generate() call
+# 70B across 4x V100S 32GB: batch_size=16
+# 8B on 1x V100S 32GB: batch_size=64
+batch_size: 64
+
+# Anthropic Batch API (02_perturb_combined.py)
+# leave anthropic_api_key blank to use ANTHROPIC_API_KEY env var
+anthropic_api_key: ""
+# cap number of names to process (null = all)
+max_names: 100000
 
 # perturbation
 # phonetic Latin variants per name (phase 1)
@@ -39,6 +48,32 @@ split_train: 0.8
 split_val: 0.1
 split_test: 0.1
 
-# hard negative mining 
-hard_negative_warmup_steps: 1000
-hard_negative_mix_ratio: 0.5
+# hard negative mining
+hard_negative_warmup_steps: 200
+hard_negative_mix_ratio: 0.7
+hard_negative_mix_ramp_steps: 500
+
+# model architecture
+hidden_dim: 256
+n_layers: 6
+n_heads: 8
+ffn_dim: 1024
+dropout: 0.1
+max_len: 256
+
+# loss
+loss: "infonce"   # "infonce" or "triplet"
+temperature: 0.07 # for infonce
+margin: 0.3       # for triplet
+
+# training
+# train_batch_size is separate from batch_size (which is used for HF inference)
+# InfoNCE benefits from large batches — more in-batch negatives per step
+train_batch_size: 512
+lr: 3e-4
+epochs: 20
+warmup_steps: 500
+weight_decay: 0.01
+refresh_every: 200    # steps between FAISS hard-negative index rebuilds
+eval_every: 91        # once per epoch
+checkpoint_dir: "checkpoints/"

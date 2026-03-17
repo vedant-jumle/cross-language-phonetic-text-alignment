@@ -1,0 +1,16 @@
+{
+  "architectures": [
+    "ByteLevelEncoder"
+  ],
+  "dropout": 0.1,
+  "dtype": "float32",
+  "ffn_dim": 1024,
+  "hidden_dim": 256,
+  "max_len": 256,
+  "model_type": "byte_encoder",
+  "n_heads": 8,
+  "n_layers": 6,
+  "pad_token_id": 0,
+  "transformers_version": "5.3.0",
+  "vocab_size": 256
+}

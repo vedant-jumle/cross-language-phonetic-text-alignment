@@ -1,8 +1,9 @@
 import json
 import hashlib
 from pathlib import Path
+from tqdm.auto import tqdm
 
-INPUT_PATH = "data/pipeline/03_perturbed_scripts.jsonl"
+INPUT_PATH = "data/pipeline/02_perturbed_combined.jsonl"
 OUTPUT_PATH = "data/pipeline/04_dataset.jsonl"
 
 def to_bytes(text: str) -> list[int]:
@@ -79,8 +80,9 @@ def main(config):
     output_path = Path(OUTPUT_PATH)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(INPUT_PATH, encoding="utf-8") as fin, open(OUTPUT_PATH, "w", encoding="utf-8") as fout:
-        for line in fin:
+    lines = Path(INPUT_PATH).read_text(encoding="utf-8").splitlines()
+    with open(OUTPUT_PATH, "w", encoding="utf-8") as fout:
+        for line in tqdm(lines, desc="Merging records"):
             record = json.loads(line)
             merged = merge_wikidata_record(record, config)
             fout.write(json.dumps(merged, ensure_ascii=False) + "\n")
