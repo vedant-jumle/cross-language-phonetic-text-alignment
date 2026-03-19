@@ -24,3 +24,15 @@ def aggregate(ranks, ks):
         "NDC@10": compute_ndcg(ranks, 10),
     }
     return agg
+
+def load_retriever(name):
+    if name == "model":
+        from src.eval.model_retriever import build_index, retrieve
+    elif name == "levenshtein":
+        from src.eval.baselines.levenshtein import build_index, retrieve
+    elif name == "soundex":
+        from src.eval.baselines.soundex import build_index, retrieve
+    elif name == "bm25":
+        from src.eval.baselines.bm25 import build_index, retrieve
+    elif name == "transliterate":
+        from src.eval.baselines.transliterate import build_index, retrieve
