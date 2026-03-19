@@ -4,11 +4,11 @@ import json
 from tqdm import tqdm
 from pathlib import Path
 
-def computer_mrr(ranks, k=10):
+def compute_mrr(ranks, k=10):
     vals = [(1/r if r is not None and r <= k else 0.0) for r in ranks]
     return float(np.mean(vals)) if vals else 0.0
 
-def computer_recall(ranks, k):
+def compute_recall(ranks, k):
     vals = [(1 if r is not None and r <= k else 0) for r in ranks]
     return float(np.mean(vals)) if vals else 0.0
 
@@ -23,9 +23,9 @@ def compute_ndcg(ranks, k):
 
 def aggregate(ranks, ks):
     agg = {
-        "MRR": computer_mrr(ranks, k=10),
-        **{f"Recall@{k}": computer_recall(ranks, k) for k in ks},
-        "NDC@10": compute_ndcg(ranks, 10),
+        "MRR": compute_mrr(ranks, k=10),
+        **{f"Recall@{k}": compute_recall(ranks, k) for k in ks},
+        "NDCG@10": compute_ndcg(ranks, 10),
     }
     return agg
 
@@ -40,6 +40,9 @@ def load_retriever(name):
         from src.eval.baselines.bm25 import build_index, retrieve
     elif name == "transliterate":
         from src.eval.baselines.transliterate import build_index, retrieve
+    else:
+        raise ValueError(f"Unknown retriever: {name}")
+    return build_index, retrieve
 
 def main():
     parser = argparse.ArgumentParser()
@@ -108,12 +111,12 @@ def main():
         if q["type"] in results["by_type"]:
             results["by_type"][q["type"]].append(rank)
             
-        script = q.get("script") or "latin"
+        script = q["script"] if "script" in q else "latin"
         if script not in results["by_script"]:
             results["by_script"][script] = []
         results["by_script"][script].append(rank)
 
-        output = {
+    output = {
             "retriever": args.retriever,
             "checkpoint": args.checkpoint,
             "k": ks,
@@ -121,17 +124,17 @@ def main():
             "n_entities": len(corpus),
             "overall": aggregate(results["overall"], ks),
             "by_type": {
-                k: aggregate(v, ks) for k,v in results["by_type"].items
+                k: aggregate(v, ks) for k,v in results["by_type"].items()
             },
             "by_script": {
-                k: aggregate(v, ks) for k,v in results["by_script"].items
+                k: aggregate(v, ks) for k,v in results["by_script"].items()
             }
         }
 
-        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-        with open(args.output, "w", encoding="utf-8") as f:
-            json.dump(output, f, indent=2, ensure_ascii=False)
-        print(f"Saved results to {args.output}")
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    with open(args.output, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2, ensure_ascii=False)
+    print(f"Saved results to {args.output}")
 
 if __name__ == "__main__":
     main()
