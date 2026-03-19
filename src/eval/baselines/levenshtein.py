@@ -13,12 +13,8 @@ def retrieve(query_text: str, query_bytes: list[int], index: Any, k: int) -> lis
         raise ValueError("k must be a positive integer")
     results = []
     for entity_id, text in index:
-        # levenstein distance
+        # levenshtein distance
         dist = editdistance.eval(query_text, text)
         results.append((dist, entity_id))
     results.sort(key=lambda x: x[0])
     return [entity_id for _, entity_id in results[:k]]
-
-
-
-

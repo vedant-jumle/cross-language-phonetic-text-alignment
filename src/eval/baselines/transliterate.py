@@ -18,7 +18,7 @@ def retrieve(query_text: str, query_bytes: list[int], index: Any, k: int) -> lis
     results = []
     latin_query = t.transliterate(query_text)
     for entity_id, text in index:
-        # levenshthein distance
+        # levenshtein distance
         dist = editdistance.eval(latin_query, text)
         results.append((dist, entity_id))
     results.sort(key=lambda x: x[0])
