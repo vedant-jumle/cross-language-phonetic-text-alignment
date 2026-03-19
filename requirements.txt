@@ -2,3 +2,7 @@ requests>=2.31.0
 tqdm>=4.66.0
 pandas>=2.0.0
 PyYAML>=6.0
+editdistance==0.8.1
+metaphone==0.6
+PyICU==2.15.2
+rank-bm25==0.2.2
