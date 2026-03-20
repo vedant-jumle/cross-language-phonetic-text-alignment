@@ -33,25 +33,24 @@ def merge_wikidata_record(record: dict, config: dict) -> dict:
             })
 
     for name, scripts in record.get("script_variants", {}).items():
-        if name == record["name_en"]:
-            typ = "script"
-        else:
-            typ = "combined"
-        for text in scripts.values():
+        typ = "script" if name == record["name_en"] else "combined"
+        for script_key, text in scripts.items():
             if text:
                 positives.append({
                     "text": text,
                     "bytes": to_bytes(text),
                     "type": typ,
+                    "script": script_key,
                     "source": "llm"
                 })
 
-    for value in record.get("wikidata", {}).values():
+    for key, value in record.get("wikidata", {}).items():
         if value:
             positives.append({
                 "text": value,
                 "bytes": to_bytes(value),
                 "type": "script",
+                "script": key.replace("name_", ""),
                 "source": "wikidata"
             })
 
