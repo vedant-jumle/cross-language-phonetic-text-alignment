@@ -1,8 +1,34 @@
 import numpy as np
 import argparse
 import json
+import os
 from tqdm import tqdm
 from pathlib import Path
+
+PARALLEL_RETRIEVERS = {"levenshtein", "bm25", "soundex"}
+
+def _run_query(args):
+    q, index, max_k, retrieve_fn = args
+    retrieved = retrieve_fn(q["text"], q["bytes"], index, max_k)
+    rank = None
+    for i, eid in enumerate(retrieved):
+        if eid == q["entity_id"]:
+            rank = i + 1
+            break
+    return rank, q["type"], q.get("script", "latin")
+
+def _run_query_batch(args):
+    queries_chunk, index, max_k, retrieve_fn = args
+    results = []
+    for q in queries_chunk:
+        retrieved = retrieve_fn(q["text"], q["bytes"], index, max_k)
+        rank = None
+        for i, eid in enumerate(retrieved):
+            if eid == q["entity_id"]:
+                rank = i + 1
+                break
+        results.append((rank, q["type"], q.get("script", "latin")))
+    return results
 
 def compute_mrr(ranks, k=10):
     vals = [(1/r if r is not None and r <= k else 0.0) for r in ranks]
@@ -55,6 +81,8 @@ def main():
     parser.add_argument("--dataset", required=True)
     parser.add_argument("--k", nargs="+", type=int, required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument("--n_jobs", type=int, default=None,
+                        help="Parallel workers for CPU retrievers. Ignored for model retriever.")
     args = parser.parse_args()
 
     ks = sorted(args.k)
@@ -103,19 +131,36 @@ def main():
     }
 
     print(f"Running {len(queries)} queries...")
-    for q in tqdm(queries):
-        retrieved = retrieve(q["text"], q["bytes"], index, max_k)
-        rank = None
-        for i, eid in enumerate(retrieved):
-            if eid == q["entity_id"]:
-                rank = i+1
-                break
-        results["overall"].append(rank)
+    if args.retriever in PARALLEL_RETRIEVERS:
+        from pqdm.processes import pqdm as pqdm_proc
+        n_jobs = args.n_jobs or os.cpu_count()
+        chunk_size = max(1, len(queries) // n_jobs)
+        chunks = [queries[i:i + chunk_size] for i in range(0, len(queries), chunk_size)]
+        job_args = [(chunk, index, max_k, retrieve) for chunk in chunks]
+        chunk_results = pqdm_proc(job_args, _run_query_batch, n_jobs=n_jobs)
+        query_results = []
+        for chunk in chunk_results:
+            if isinstance(chunk, Exception):
+                raise chunk
+            query_results.extend(chunk)
+    else:
+        query_results = []
+        for q in tqdm(queries):
+            retrieved = retrieve(q["text"], q["bytes"], index, max_k)
+            rank = None
+            for i, eid in enumerate(retrieved):
+                if eid == q["entity_id"]:
+                    rank = i + 1
+                    break
+            query_results.append((rank, q["type"], q.get("script", "latin")))
 
-        if q["type"] in results["by_type"]:
-            results["by_type"][q["type"]].append(rank)
-            
-        script = q["script"] if "script" in q else "latin"
+    for result in query_results:
+        if isinstance(result, Exception):
+            raise result
+        rank, qtype, script = result
+        results["overall"].append(rank)
+        if qtype in results["by_type"]:
+            results["by_type"][qtype].append(rank)
         if script not in results["by_script"]:
             results["by_script"][script] = []
         results["by_script"][script].append(rank)
