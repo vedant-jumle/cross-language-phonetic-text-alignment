@@ -20,7 +20,7 @@ hf_model_id: "/scratch/vvjumle/models/Llama-3.1-8B-Instruct"
 # names per model.generate() call
 # 70B across 4x V100S 32GB: batch_size=16
 # 8B on 1x V100S 32GB: batch_size=64
-batch_size: 32
+batch_size: 64
 
 # Anthropic Batch API (02_perturb_combined.py)
 # leave anthropic_api_key blank to use ANTHROPIC_API_KEY env var
