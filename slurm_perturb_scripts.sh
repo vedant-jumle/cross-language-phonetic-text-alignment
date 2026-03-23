@@ -15,16 +15,10 @@ set -e
 REPO=/scratch/vvjumle/ir-pipeline
 SCRATCH_DATA=/scratch/vvjumle/ir-pipeline/data/pipeline
 
-mkdir -p /scratch/vvjumle/logs
-mkdir -p $SCRATCH_DATA
-
 module load 2025
 module load miniconda3
 conda activate ir-pipeline
 module load cuda/12.9
-
-# Make sure data/pipeline points to scratch (symlink)
-ln -sfn $SCRATCH_DATA $REPO/data/pipeline
 
 cd $REPO
 
