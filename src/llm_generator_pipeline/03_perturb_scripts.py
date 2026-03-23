@@ -71,7 +71,7 @@ def main(config_path):
                     pairs.append((rec_idx, name))
 
             prompts = [build_prompt(name, target_scripts) for _, name in pairs]
-            responses = call_hf_batch(prompts, model_id)
+            responses = call_hf_batch(prompts, model_id, max_new_tokens=150)
 
             # Re-assign responses back to their entity
             script_variants = [{} for _ in batch]
