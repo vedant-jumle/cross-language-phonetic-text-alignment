@@ -86,7 +86,7 @@ def main(config_path):
                     "latin_variants": record.get("latin_variants", []),
                     "script_variants": sv,
                 }
-                out.write(json.dumps(output, ensure_ascii=False) + "\n")
+                out.write(json.dumps(output, ensure_ascii=False).encode('utf-8', errors='replace').decode('utf-8') + "\n")
             out.flush()
 
 if __name__ == "__main__":
