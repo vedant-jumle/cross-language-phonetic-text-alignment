@@ -70,12 +70,15 @@ def main(config_path):
                 for name in all_names:
                     pairs.append((rec_idx, name))
 
-            # Send each name individually to avoid GPU OOM from padding large batches
+            # Send names in sub-batches to balance throughput vs GPU memory
             script_variants = [{} for _ in batch]
-            for rec_idx, name in pairs:
-                prompt = build_prompt(name, target_scripts)
-                raw = call_hf_batch([prompt], model_id, max_new_tokens=150)[0]
-                script_variants[rec_idx][name] = parse_scripts(raw, target_scripts)
+            prompt_batch_size = 8
+            for j in range(0, len(pairs), prompt_batch_size):
+                sub_pairs = pairs[j : j + prompt_batch_size]
+                prompts = [build_prompt(name, target_scripts) for _, name in sub_pairs]
+                responses = call_hf_batch(prompts, model_id, max_new_tokens=150)
+                for (rec_idx, name), raw in zip(sub_pairs, responses):
+                    script_variants[rec_idx][name] = parse_scripts(raw, target_scripts)
 
             for record, sv in zip(batch, script_variants):
                 output = {
