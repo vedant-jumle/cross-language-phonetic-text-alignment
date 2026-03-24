@@ -10,7 +10,7 @@ sample_seed: 42
 
 # LLM (local HF inference)
 hf_model_id: "/scratch/vvjumle/models/Llama-3.1-8B-Instruct"
-batch_size: 64
+batch_size: 4
 
 # Anthropic Batch API
 anthropic_api_key: ""
