@@ -24,5 +24,5 @@ cd $REPO
 
 echo "=== Stage 03: Script transliterations ==="
 python src/llm_generator_pipeline/03_perturb_scripts.py \
-    --config src/llm_generator_pipeline/config.yaml
+    --config src/llm_generator_pipeline/config_hpc.yaml
 
