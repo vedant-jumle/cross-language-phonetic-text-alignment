@@ -63,19 +63,18 @@ def main(config_path):
         for i in tqdm(range(0, len(records), batch_size), desc="Transliterating scripts"):
             batch = records[i : i + batch_size]
 
-            # Flatten all names across entities into one batch of prompts
-            pairs = []  # (record_idx, name)
+            # Collect all (entity_idx, name) pairs across the batch
+            pairs = []
             for rec_idx, record in enumerate(batch):
                 all_names = [record["name_en"]] + record.get("latin_variants", [])
                 for name in all_names:
                     pairs.append((rec_idx, name))
 
-            prompts = [build_prompt(name, target_scripts) for _, name in pairs]
-            responses = call_hf_batch(prompts, model_id, max_new_tokens=150)
-
-            # Re-assign responses back to their entity
+            # Send each name individually to avoid GPU OOM from padding large batches
             script_variants = [{} for _ in batch]
-            for (rec_idx, name), raw in zip(pairs, responses):
+            for rec_idx, name in pairs:
+                prompt = build_prompt(name, target_scripts)
+                raw = call_hf_batch([prompt], model_id, max_new_tokens=150)[0]
                 script_variants[rec_idx][name] = parse_scripts(raw, target_scripts)
 
             for record, sv in zip(batch, script_variants):
