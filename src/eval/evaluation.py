@@ -5,7 +5,7 @@ import os
 from tqdm import tqdm
 from pathlib import Path
 
-PARALLEL_RETRIEVERS = {"levenshtein", "bm25", "soundex"}
+PARALLEL_RETRIEVERS = {"levenshtein", "bm25", "soundex", "transliterate"}
 
 def _run_query(args):
     q, index, max_k, retrieve_fn = args
