@@ -1,0 +1,15 @@
+\begin{table}
+\caption{Overall retrieval performance (11,974 entities, 470,772 queries).}
+\label{tab:overall}
+\begin{tabular}{lrrrrr}
+\toprule
+Retriever & MRR & R@1 & R@5 & R@10 & NDCG@10 \\
+\midrule
+Levenshtein & 0.094 & 0.089 & 0.100 & 0.105 & 0.097 \\
+Soundex & 0.096 & 0.092 & 0.101 & 0.106 & 0.098 \\
+BM25 & 0.083 & 0.077 & 0.091 & 0.097 & 0.086 \\
+Transliterate & 0.565 & 0.511 & 0.635 & 0.681 & 0.592 \\
+\textbf{Byte Encoder (ours)} & \textbf{0.775} & \textbf{0.711} & \textbf{0.859} & \textbf{0.897} & \textbf{0.804} \\
+\bottomrule
+\end{tabular}
+\end{table}

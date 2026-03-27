@@ -1,0 +1,14 @@
+\begin{table}
+\caption{FAISS index ablation on the same model checkpoint. HNSW matches exact search recall at 5.3$\times$ lower latency.}
+\label{tab:faiss}
+\begin{tabular}{lrrrr}
+\toprule
+Index & R@1 & R@10 & Latency (ms) & Size \\
+\midrule
+FlatIP (exact) & 0.711 & 0.897 & 0.17 & 12.3\,MB \\
+IVF-Flat & 0.703 & 0.878 & 0.03 & 12.5\,MB \\
+\textbf{HNSW} & \textbf{0.711} & \textbf{0.896} & \textbf{0.03} & \textbf{15.5\,MB} \\
+IVF-PQ & 0.604 & 0.833 & 0.06 & 0.6\,MB \\
+\bottomrule
+\end{tabular}
+\end{table}

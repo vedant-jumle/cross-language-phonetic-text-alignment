@@ -1,0 +1,190 @@
+%%
+%% ACM sigconf template — DSAIT4050 IR Group 10 Project Report
+%%
+\documentclass[sigconf]{acmart}
+
+\AtBeginDocument{%
+  \providecommand\BibTeX{{Bib\TeX}}}
+
+%% Course submission — no ACM rights needed
+\setcopyright{none}
+\acmConference[DSAIT4050 '25]{Information Retrieval}{Q3 2025}{Delft, Netherlands}
+
+\begin{document}
+
+\title[Cross-Script Phonetic Name Retrieval]{Cross-Script Phonetic Name Retrieval via Byte-Level Contrastive Embeddings}
+
+\renewcommand{\shortauthors}{Jumle et al.}
+
+\author{Vedant Vivek Jumle}
+\email{v.v.jumle@student.tudelft.nl}
+\affiliation{%
+  \institution{Delft University of Technology}
+}
+
+\author{TODO: Author 2}
+\email{TODO@student.tudelft.nl}
+\affiliation{%
+  \institution{Delft University of Technology}
+}
+
+\author{TODO: Author 3}
+\email{TODO@student.tudelft.nl}
+\affiliation{%
+  \institution{Delft University of Technology}
+}
+
+\author{TODO: Author 4}
+\email{TODO@student.tudelft.nl}
+\affiliation{%
+  \institution{Delft University of Technology}
+}
+
+%%
+%% CCS Concepts
+%%
+\begin{CCSXML}
+<ccs2012>
+ <concept>
+  <concept_id>10010147.10010178</concept_id>
+  <concept_desc>Information systems~Retrieval models and ranking</concept_desc>
+  <concept_significance>500</concept_significance>
+ </concept>
+ <concept>
+  <concept_id>10010147.10010257.10010293.10010294</concept_id>
+  <concept_desc>Computing methodologies~Neural networks</concept_desc>
+  <concept_significance>300</concept_significance>
+ </concept>
+ <concept>
+  <concept_id>10010147.10010178.10010179.10010182</concept_id>
+  <concept_desc>Information systems~Similarity measures</concept_desc>
+  <concept_significance>300</concept_significance>
+ </concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Information systems~Retrieval models and ranking}
+\ccsdesc[300]{Computing methodologies~Neural networks}
+\ccsdesc[300]{Information systems~Similarity measures}
+
+\keywords{cross-script retrieval, phonetic embeddings, byte-level encoding, contrastive learning, name matching}
+
+\begin{abstract}
+Retrieving person names across different writing systems is a fundamental challenge in multilingual
+information retrieval: a query like ``Schwarzenegger'' should match its Arabic, Russian, or Chinese
+phonetic equivalents, despite sharing no characters. Existing approaches based on edit distance or
+phonetic hashing fail entirely once the script boundary is crossed.
+
+We present a byte-level transformer encoder trained with InfoNCE contrastive loss and
+Approximate Nearest Neighbour hard-negative mining. The model operates directly on raw UTF-8
+bytes---requiring no tokeniser, no language-specific preprocessing, and no script detection.
+We construct a dataset of 119,040 named entities with 4.67 million positive pairs spanning
+8 non-Latin scripts (Arabic, Russian, Chinese, Japanese, Hebrew, Hindi, Greek, Korean), generated
+via LLM-based phonetic transliteration.
+
+Our model achieves 0.775 MRR and 0.897 R@10 overall, reducing the script gap in R@10 from
+0.93 (edit-distance baseline) to 0.098---a 10$\times$ reduction---while outperforming the best
+rule-based baseline (transliterate, 0.565 MRR) by 37\%.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+
+Retrieving a person by name is deceptively hard when the query and the indexed record
+differ in script. A sanctions screening system must match \textit{Владимир Путин} against
+\textit{Vladimir Putin}; a hospital patient-matching system must link \textit{محمد} to
+\textit{Mohamed} or \textit{Muhammad}. In each case the same individual is referred to,
+yet the surface forms share no characters. Classical approaches---Levenshtein edit
+distance~\cite{levenshtein1966binary,navarro2001guided}, Soundex, and BM25~\cite{robertson2009bm25}---operate
+on raw character sequences and fail completely once a script boundary is crossed.
+
+Recent work has shown that even strong multilingual dense retrievers degrade significantly
+when queries are transliterated rather than written in their native script~\cite{chari2025lost}.
+This \textit{script gap} is most severe for short name entities, where there is no surrounding
+semantic context to compensate for surface-level mismatch. Rule-based transliteration pipelines
+(e.g., ICU transliterate) partially close the gap, but apply a fixed canonical mapping that cannot
+capture the phonetic variation introduced by different romanization conventions or LLM-generated
+phonetic perturbations.
+
+We address the specific problem of \textbf{cross-script phonetic name retrieval}: given a query
+name in any script or phonetic form, retrieve the correct named entity from a corpus indexed by
+its English name. We propose a lightweight transformer encoder trained from scratch on raw UTF-8
+bytes~\cite{xue2022byt5,vaswani2017attention}. Each character in any writing system decomposes
+deterministically into 1--4 bytes from a fixed 256-token vocabulary, eliminating out-of-vocabulary
+tokens entirely and requiring no script detection or language-specific preprocessing. The encoder
+is trained with InfoNCE contrastive loss~\cite{oord2018cpc} and ANCE-style hard-negative
+mining~\cite{robinson2021hardneg}, pushing phonetically equivalent names together and
+phonetically distinct names apart in embedding space.
+
+To train and evaluate the model, we construct a dataset of 119,040 named entities with 4.67
+million positive name pairs covering 8 non-Latin scripts (Arabic, Russian, Chinese, Japanese,
+Hebrew, Hindi, Greek, Korean), generated via LLM-based phonetic transliteration and augmented
+with Wikidata ground truth. Evaluation distinguishes three query types: \textit{phonetic} (Latin
+variant of the English name), \textit{script} (direct transliteration into a non-Latin script),
+and \textit{combined} (phonetic Latin variant transliterated into a non-Latin script).
+
+Our main contributions are: (1) a controlled benchmark for cross-script and phonetically perturbed
+name retrieval; (2) a compact byte-level contrastive encoder that achieves 0.897~R@10 and 0.775~MRR
+overall, reducing the script gap in R@10 from 0.93 to 0.098---a 10$\times$ reduction over
+edit-distance baselines; and (3) a systematic comparison of classical string-similarity baselines,
+rule-based transliteration, and dense retrieval, with a FAISS index ablation characterising the
+recall--latency tradeoff~\cite{johnson2021faiss,malkov2020hnsw}.
+
+\section{Related Work}
+
+
+\section{Method}
+
+
+\section{Dataset}
+
+
+\section{Experiments}
+
+
+\section{Concluding Remarks}
+
+
+\begin{acks}
+Course project for DSAIT4050 Information Retrieval, Q3 2025, Delft University of Technology.
+\end{acks}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{sample-base}
+
+%%
+%% The following sections are excluded from the 4-page limit.
+%%
+
+\section*{Link to Repository}
+
+The code, dataset pipeline scripts, trained model checkpoint, and evaluation scripts are available at:
+\url{https://github.com/TODO/ir-group10}
+
+\section*{Self-Assessment of Contributions}
+
+% TODO: each group member fills in their own paragraph.
+
+\noindent\textbf{Vedant Vivek Jumle (5296196):} TODO
+
+\noindent\textbf{TODO Author 2:} TODO
+
+\noindent\textbf{TODO Author 3:} TODO
+
+\noindent\textbf{TODO Author 4:} TODO
+
+\section*{Declaration of Generative AI Usage}
+
+This project used generative AI tools as writing aids and for code assistance.
+Specifically, \textbf{Claude Sonnet 4.6} (Anthropic) was used to assist with writing
+refinement---improving clarity, grammar, and structure of sections drafted by the authors.
+The original intellectual contributions, research design, experimental methodology,
+and interpretation of results are entirely our own.
+All AI-assisted text was reviewed, revised, and approved by the authors before inclusion.
+
+In accordance with the CEUR-WS GenAI Usage Taxonomy, our usage falls under
+\emph{Writing Aid}---the tool refined prose written by the authors, but did not generate
+novel scientific content or conclusions.
+
+\end{document}

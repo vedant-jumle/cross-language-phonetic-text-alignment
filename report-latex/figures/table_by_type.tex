@@ -1,0 +1,15 @@
+\begin{table}
+\caption{MRR by query type. Combined queries (Latin variant $\rightarrow$ non-Latin script) are the hardest.}
+\label{tab:by_type}
+\begin{tabular}{lrrr}
+\toprule
+Retriever & Phonetic & Script & Combined \\
+\midrule
+Levenshtein & 0.894 & 0.014 & 0.004 \\
+Soundex & 0.915 & 0.014 & 0.004 \\
+BM25 & 0.791 & 0.014 & 0.003 \\
+Transliterate & 0.894 & 0.684 & 0.485 \\
+\textbf{Byte Encoder (ours)} & \textbf{0.937} & \textbf{0.827} & \textbf{0.738} \\
+\bottomrule
+\end{tabular}
+\end{table}
