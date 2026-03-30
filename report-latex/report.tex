@@ -133,6 +133,35 @@ recall--latency tradeoff~\cite{johnson2021faiss,malkov2020hnsw}.
 
 \section{Related Work}
 
+\noindent\textbf{Fuzzy name matching.}
+Classical name matching relies on character-level edit distance~\cite{levenshtein1966binary,navarro2001guided}
+and phonetic codes such as Soundex and Metaphone, which encode names by their approximate English
+pronunciation. BM25~\cite{robertson2009bm25} with character $n$-grams provides a sparse retrieval
+baseline. These methods are effective within a single script but fail categorically across script
+boundaries: a Latin query and an Arabic document share no character-level overlap regardless of
+phonetic similarity.
+
+\noindent\textbf{Script gap in neural IR.}
+Chari et al.~\cite{chari2025lost} show that strong multilingual dense retrievers such as
+BGE-M3~\cite{chen2024bge} degrade severely when queries are transliterated rather than written in
+their native script. Their mitigation strategy fine-tunes existing models on mixtures of native and
+Latinised text, requiring large pretrained multilingual backbones. Liu et al.~\cite{liu2024translico}
+(TransliCo) address the same barrier by contrasting sentence representations with their Latin
+transliterations during pretraining, improving cross-script alignment in general NLP tasks. Both
+works treat the script gap as a fine-tuning or pretraining problem for sentence-level encoders.
+We instead ask whether it can be solved \emph{from scratch}, for the specific case of short name
+entities where no semantic context is available to compensate for surface mismatch.
+
+\noindent\textbf{Contrastive dense retrieval.}
+Karpukhin et al.~\cite{karpukhin2020dpr} (DPR) establish the dual-encoder paradigm, training
+encoders with in-batch negatives to maximise query--document similarity. Gao et al.~\cite{gao2021simcse}
+(SimCSE) demonstrate that hard negatives substantially improve contrastive embedding quality, and
+Robinson et al.~\cite{robinson2021hardneg} provide grounding for hard-negative selection. The InfoNCE
+objective~\cite{oord2018cpc} underlies our training loss. We adopt the contrastive retrieval framework
+but train entirely from scratch on raw UTF-8 bytes~\cite{xue2022byt5}, without inheriting pretrained
+representations---motivated by the incompatibility of subword vocabularies with cross-script phonetic
+alignment.
+
 
 \section{Method}
 
