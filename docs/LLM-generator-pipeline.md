@@ -32,6 +32,7 @@ src/
   llm_generator_pipeline/
     01_sample.py
     02_perturb_latin.py
+    02_perturb_combined.py   # v0.1 POC only — Anthropic Batch API, not used in v2
     03_perturb_scripts.py
     04_merge_wikidata.py
     config.yaml
@@ -53,18 +54,22 @@ docs/
 ## Configuration (`config.yaml`)
 
 ```yaml
-# Sampling
-sample_size: 50000
+# Sampling — set large; if >= population, returns full dataset
+sample_size: 1000000
 sample_seed: 42
 
-# LLM
-llm_model: "llama3.1"           # any Ollama model name
-llm_base_url: "http://localhost:11434"
-batch_size: 20                  # names per LLM prompt
+# LLM (Stage 2 — HF inference on DelftBlue HPC)
+hf_model_id: "meta-llama/Llama-3.1-8B-Instruct"
+batch_size: 2                   # names per model.generate() call (HF inference)
+                                # 8B on 1x V100S 32GB: batch_size=64 on HPC
+
+# Anthropic Batch API (02_perturb_combined.py — v0.1 POC only, not used in v2)
+anthropic_api_key: ""           # falls back to ANTHROPIC_API_KEY env var
+max_names: 100000
 
 # Perturbation
-n_perturbations: 4              # phonetic Latin variants per name
-target_scripts:                 # scripts for phase 2 transliteration
+n_perturbations: 4              # phonetic Latin variants per name (Stage 2)
+target_scripts:                 # scripts for Stage 3 transliteration
   - ar
   - ru
   - zh
@@ -80,8 +85,9 @@ split_val: 0.1
 split_test: 0.1
 
 # Hard negative mining (used by training, not pipeline)
-hard_negative_warmup_steps: 1000
-hard_negative_mix_ratio: 0.5    # fraction of hard vs easy negatives per batch
+hard_negative_warmup_steps: 200
+hard_negative_mix_ratio: 0.7    # fraction of hard vs easy negatives per batch
+hard_negative_mix_ramp_steps: 500
 ```
 
 ---
@@ -126,25 +132,32 @@ Sample proportionally within each bucket so the sample is not dominated by Engli
 
 **Input:** `data/pipeline/01_sampled.jsonl`
 **Output:** `data/pipeline/02_perturbed_latin.jsonl`
+**Infrastructure:** TU Delft DelftBlue HPC (A100 80GB / V100S 32GB)
+**Model:** `meta-llama/Llama-3.1-8B-Instruct` via HuggingFace `call_hf_batch`
 
 ### LLM Prompt
 
+One name per prompt call (not batched at prompt level — batched at inference level via `call_hf_batch`):
+
 ```
-Given these English names, generate {n_perturbations} realistic phonetic
-spelling variants for each. Variants should sound similar when spoken aloud
-but differ in spelling. Do NOT generate: nicknames, abbreviations, or
-shortened forms.
+Generate {n_perturbations} DISTINCT phonetic spelling variants of this name
+as it sounds when spoken: "{name}"
 
-Names: ["Catherine", "John", "Mohammed", ...]
+Rules:
+- Each variant must be spelled differently from all others and from the original
+- Simulate how different people might mishear or misspell the name phonetically
+- Keep the same number of words as the original
+- Do NOT repeat variants
+- Do NOT use nicknames, abbreviations, or shortened forms
+- Do NOT change language (stay in Latin script)
 
-Return JSON only: {"Catherine": ["Kathryn", "Katerin", ...], "John": [...], ...}
+Example: "Catherine" → ["Kathryn", "Katherin", "Cathryn", "Katheryne"]
+
+Return a JSON array of exactly {n_perturbations} strings, no explanation:
+["variant1", "variant2", ...]
 ```
 
-Batches `batch_size` names per prompt. Parses JSON response, retries on malformed output (up to 3 attempts).
-
-### Checkpointing
-
-Tracks processed `entity_id`s in output file. On restart, skips already-processed names. Flushes to disk after each batch.
+Processes `batch_size` names per `model.generate()` call. Parses JSON array response; falls back to dict-value extraction on malformed output. Checkpointed — skips already-processed `entity_id`s on restart, flushes after each batch.
 
 ### Output Record
 
@@ -163,24 +176,21 @@ Tracks processed `entity_id`s in output file. On restart, skips already-processe
 
 **Input:** `data/pipeline/02_perturbed_latin.jsonl`
 **Output:** `data/pipeline/03_perturbed_scripts.jsonl`
+**Infrastructure:** TU Delft TULIP API (`https://api.tulip.tudelft.nl/code/v1/`)
+**Model:** `Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8` (accessed as model `"code"` via OpenAI-compatible client)
+**Concurrency:** 50 threads via `ThreadPoolExecutor`
 
 ### LLM Prompt
 
+One name per API call; structured JSON output enforced via `json_schema` response format:
+
 ```
-Transliterate each of these names into the following scripts: {scripts}.
-Use phonetic transliteration only — how the name sounds, not its meaning.
-
-Names: ["Catherine", "Kathryn", "Katerin", "Kathrin"]
-
-Return JSON only:
-{
-  "Catherine": {"ar": "كاثرين", "ru": "Катрин", ...},
-  "Kathryn":   {"ar": "...", "ru": "...", ...},
-  ...
-}
+Transliterate "{name}" into {target_scripts} phonetically.
 ```
 
-Processes `name_en` + all `latin_variants` for each identity. Same checkpoint/resume logic as Stage 2.
+Response format schema enforces a JSON object with one key per target script (e.g. `{"ar": "...", "ru": "...", ...}`). No free-text parsing needed — model returns validated JSON directly.
+
+Processes `name_en` + all `latin_variants` for each identity as independent concurrent requests. Writes a record only after all names for that entity complete. Checkpointed — skips already-processed `entity_id`s on restart.
 
 ### Output Record
 

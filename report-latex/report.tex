@@ -20,24 +20,28 @@
 \email{v.v.jumle@student.tudelft.nl}
 \affiliation{%
   \institution{Delft University of Technology}
+  \country{Netherlands}
 }
 
-\author{TODO: Author 2}
-\email{TODO@student.tudelft.nl}
+\author{Carolyn Alcaraz}
+\email{C.Alcaraz-1@student.tudelft.nl}
 \affiliation{%
   \institution{Delft University of Technology}
+  \country{Netherlands}
 }
 
-\author{TODO: Author 3}
-\email{TODO@student.tudelft.nl}
+\author{Gonenc Turanli}
+\email{G.Turanli-1@student.tudelft.nl}
 \affiliation{%
   \institution{Delft University of Technology}
+  \country{Netherlands}
 }
 
 \author{TODO: Author 4}
 \email{TODO@student.tudelft.nl}
 \affiliation{%
   \institution{Delft University of Technology}
+  \country{Netherlands}
 }
 
 %%
@@ -82,9 +86,10 @@ We construct a dataset of 119,040 named entities with 4.67 million positive pair
 8 non-Latin scripts (Arabic, Russian, Chinese, Japanese, Hebrew, Hindi, Greek, Korean), generated
 via LLM-based phonetic transliteration.
 
-Our model achieves 0.775 MRR and 0.897 R@10 overall, reducing the script gap in R@10 from
-0.93 (edit-distance baseline) to 0.098---a 10$\times$ reduction---while outperforming the best
-rule-based baseline (transliterate, 0.565 MRR) by 37\%.
+Our model achieves 0.775 MRR and 0.897 R@10 overall, reducing the R@10 script gap---the
+difference between Latin and non-Latin query performance---from 0.93 (edit-distance baselines)
+to 0.098, a 10$\times$ reduction, while outperforming the strongest baseline (Transliterate,
+0.565 MRR) by 37\%.
 \end{abstract}
 
 \maketitle
@@ -93,8 +98,8 @@ rule-based baseline (transliterate, 0.565 MRR) by 37\%.
 
 Retrieving a person by name is deceptively hard when the query and the indexed record
 differ in script. A sanctions screening system must match \textit{Владимир Путин} against
-\textit{Vladimir Putin}; a hospital patient-matching system must link \textit{محمد} to
-\textit{Mohamed} or \textit{Muhammad}. In each case the same individual is referred to,
+\textit{Vladimir Putin}; a border control system must link \textit{Αλέξανδρος} to
+\textit{Alexandros} or \textit{Aleksander}. In each case the same individual is referred to,
 yet the surface forms share no characters. Classical approaches---Levenshtein edit
 distance~\cite{levenshtein1966binary,navarro2001guided}, Soundex, and BM25~\cite{robertson2009bm25}---operate
 on raw character sequences and fail completely once a script boundary is crossed.
@@ -162,18 +167,194 @@ but train entirely from scratch on raw UTF-8 bytes~\cite{xue2022byt5}, without i
 representations---motivated by the incompatibility of subword vocabularies with cross-script phonetic
 alignment.
 
+\section{Dataset and Splits}
+We construct a large-scale dataset for cross-script phonetic name retrieval consisting of 119,040 unique person-name entities and approximately 4.67 million positive pairs. Each entity is represented by a canonical English name and multiple phonetic variants across eight non-Latin scripts: Arabic, Russian, Chinese, Japanese, Hebrew, Hindi, Greek, and Korean.
 
-\section{Method}
+\subsection{Entity Collection}
+Entities are seeded from Wikidata, which provides canonical English names along with partial cross-script labels. The 119,040 entities are drawn directly from this source via stratified sampling; the LLM pipeline then generates multiple phonetic and cross-script variants per entity, substantially expanding coverage while preserving a consistent English reference form.
 
+\subsection{Positive Pair Generation}
+Positive pairs are generated following our four-step LLM-driven pipeline:
+\begin{itemize}
+    \item Step 1: We sample entities from the full Wikidata name set using a stratified strategy based on script coverage (0, 1--2, 3--4, 5+ non-English labels).
+    \item Step 2: For each entity, we generate multiple phonetic spelling variants of the canonical English name using Llama 3.1-8B-Instruct on the TU Delft DelftBlue HPC cluster.
+    \item Step 3: For each canonical name and its Latin variants, we transliterate into the eight target scripts using Qwen3-Coder-30B-A3B-Instruct-FP8 via the TU Delft TULIP API, with structured JSON output enforced per name.
+    \item Step 4: Finally, we combine Wikidata ground truth labels with the LLM output into one unified positive set per identity, deduplicate across sources, tag positives by type (phonetic, script, combined) and source, precompute UTF-8 bytes, and assign entity-level train/val/test splits.
+\end{itemize}
 
-\section{Dataset}
+\subsection{Data Quality and Characteristics}
+Out of the 4.67 million positive pairs, only about 0.5\% are sourced from Wikidata, providing ground truth anchors for each entity. The remaining 99.5\% are LLM-generated variants, which capture realistic phonetic and cross-script variations that rule-based systems cannot. By tagging the source of each positive pair, we also allow controlled evaluation. Script-specific challenges include ambiguous romanization for Japanese and Korean, which introduced conflicting training signal and increased retrieval difficulty for these scripts.
 
+\subsection{Train-Eval-Test Split}
+We adopt a strict entity-level split, where all variants of a given entity across all scripts and phonetic forms are assigned exclusively to one partition: 80\% train, 10\% validation, 10\% test. The split is deterministic (MD5 hash of entity ID), preventing any leakage through shared phonetic structure and ensuring the model generalizes to entirely unseen identities at test time.
 
-\section{Experiments}
+\section{Methodology}
+\subsection{Training objective}
+\section{Experimental Results}
+\subsection{Overall Performance}
 
+Table~\ref{tab:overall} presents the overall retrieval performance across all methods.
+The byte-level encoder significantly outperforms all baselines, achieving an MRR of 0.775
+compared to 0.565 for the strongest baseline (Transliterate), a relative improvement of 37\%.
+Edit-distance, phonetic-hashing, and BM25 baselines cluster near 0.09 MRR---their low overall scores
+reflect the dominance of script and combined queries in the evaluation set, on which these
+methods score near zero.
+
+\begin{table}[h]
+\centering
+\caption{Overall retrieval performance (11,974 entities, 470,772 queries).}
+\label{tab:overall}
+\begin{tabular}{lccccc}
+\toprule
+Retriever & MRR & R@1 & R@5 & R@10 & NDCG@10 \\
+\midrule
+Levenshtein & 0.094 & 0.089 & 0.100 & 0.105 & 0.097 \\
+Soundex & 0.096 & 0.092 & 0.101 & 0.106 & 0.098 \\
+BM25 & 0.083 & 0.077 & 0.091 & 0.097 & 0.086 \\
+Transliterate & 0.565 & 0.511 & 0.635 & 0.681 & 0.592 \\
+\textbf{Byte encoder (ours)} & \textbf{0.775} & \textbf{0.711} & \textbf{0.859} & \textbf{0.897} & \textbf{0.804} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Performance by Query Type}
+
+Table~\ref{tab:querytype} breaks down MRR by query type.
+All methods perform comparably on phonetic queries, where query and document share the Latin script and character-level similarity is sufficient. Performance collapses for edit-distance and BM25 baselines on script and combined queries---they share no byte-level overlap with non-Latin documents, so retrieval is essentially random~\cite{chari2025lost}.
+Transliterate recovers substantially on script queries (0.684) by converting all text to Latin before matching, but falls to 0.485 on combined queries where the fixed ICU mapping cannot account for phonetic variation in the query. The byte encoder maintains strong performance across all three types (0.937 / 0.827 / 0.738), demonstrating that the contrastive training signal successfully aligns phonetically equivalent byte sequences regardless of script.
+
+Combined queries account for approximately 70\% of the evaluation set and are also the most difficult setting (0.738 MRR vs.\ 0.937 for phonetic queries). As a result, they dominate the overall metric and explain why the aggregate MRR (0.775) appears significantly lower than performance on individual query types, highlighting the importance of reporting results by query type, as overall metrics alone can obscure task difficulty.
+
+\begin{table}[h]
+\centering
+\caption{MRR by query type.}
+\label{tab:querytype}
+\begin{tabular}{lccc}
+\toprule
+Retriever & Phonetic & Script & Combined \\
+\midrule
+Levenshtein & 0.894 & 0.014 & 0.004 \\
+Soundex & 0.915 & 0.014 & 0.004 \\
+BM25 & 0.791 & 0.014 & 0.003 \\
+Transliterate & 0.894 & 0.684 & 0.485 \\
+\textbf{Byte encoder (ours)} & \textbf{0.937} & \textbf{0.827} & \textbf{0.738} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Performance by Script}
+
+Table~\ref{tab:script} reports R@10 per writing system.
+The model achieves R@10 above 0.95 on Arabic, Russian, Hebrew, Hindi, and Greek---scripts with relatively unambiguous romanization conventions where the LLM-generated training pairs are internally consistent. Greek achieves high performance (0.967 R@10) despite near-zero Wikidata supervision, owing to the near-bijective nature of Greek-to-Latin romanization: most Greek characters map consistently to a single Latin form. Japanese, despite higher Wikidata coverage than Arabic or Hebrew, underperforms due to multiple competing romanization systems (Hepburn, Kunrei-shiki, Nihon-shiki) and complex kanji readings, which introduce noise into training pairs.
+
+Chinese (0.666) and Korean (0.728) are the hardest scripts: both suffer from severe romanization ambiguity (e.g., \textit{Zhang / Chang / Cheung} for the same Chinese character; \textit{Park / Pak / Bak} in Korean), causing the model to encounter conflicting phonetic mappings for the same entity during training~\cite{chari2025lost}. Transliterate also struggles here (0.385 and 0.645), since ICU's rule-based system produces only one canonical romanization that may not match the query variant. Interestingly, BM25 performs slightly better on Chinese and Korean than other baselines. This is not due to phonetic matching, but rather incidental character $n$-gram overlap: identical CJK characters may appear in both query and corpus, producing weak lexical matches. However, this effect is coincidental and does not generalize to true cross-script retrieval.
+
+\begin{table}[h]
+\centering
+\caption{R@10 by script.}
+\label{tab:script}
+\begin{tabular}{lccccc}
+\toprule
+Script & Lev. & Soundex & BM25 & Translit. & Ours \\
+\midrule
+Latin   & 0.944 & 0.952 & 0.891 & 0.944 & \textbf{0.983} \\
+Arabic  & 0.016 & 0.016 & 0.007 & 0.659 & \textbf{0.967} \\
+Russian & 0.023 & 0.023 & 0.007 & 0.901 & \textbf{0.974} \\
+Chinese & 0.007 & 0.007 & 0.018 & 0.385 & \textbf{0.666} \\
+Hebrew  & 0.019 & 0.019 & 0.016 & 0.433 & \textbf{0.954} \\
+Hindi   & 0.012 & 0.012 & 0.002 & 0.750 & \textbf{0.973} \\
+Greek   & 0.020 & 0.021 & 0.003 & 0.828 & \textbf{0.967} \\
+Korean  & 0.003 & 0.003 & 0.017 & 0.645 & \textbf{0.728} \\
+Japanese& 0.005 & 0.005 & 0.014 & 0.598 & \textbf{0.870} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Script Gap}
+
+We define the script gap as the R@10 difference between Latin and average non-Latin queries.
+All non-transliteration baselines exhibit gaps of 0.88--0.94 (Table~\ref{tab:gap}): they retrieve well
+within Latin script but fail entirely across script boundaries, consistent with prior
+findings on neural IR~\cite{chari2025lost}. Transliterate narrows the gap to 0.275 by
+projecting all scripts to Latin. The byte encoder reduces it further to \textbf{0.098}---a
+$10\times$ reduction over the Levenshtein baseline---while simultaneously improving Latin
+R@10 from 0.944 to 0.983.
+
+The reduction in script gap is therefore driven not only by improved cross-script matching, but also by consistent performance across scripts with stable romanization, while remaining robust under ambiguous conditions such as CJK.
+
+\begin{table}[h]
+\centering
+\caption{Script gap: R@10 difference between Latin and average non-Latin queries.}
+\label{tab:gap}
+\begin{tabular}{lccc}
+\toprule
+Retriever & Latin & Non-Latin (avg) & Gap \\
+\midrule
+Levenshtein & 0.944 & 0.013 & 0.931 \\
+Soundex     & 0.952 & 0.013 & 0.939 \\
+BM25        & 0.891 & 0.010 & 0.881 \\
+Transliterate & 0.944 & 0.669 & 0.275 \\
+\textbf{Byte encoder (ours)} & \textbf{0.983} & \textbf{0.885} & \textbf{0.098} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Indexing Efficiency}
+
+Table~\ref{tab:faiss} reports the FAISS index ablation.
+HNSW~\cite{malkov2020hnsw} matches the recall of exact FlatIP search (R@10: 0.896 vs.\ 0.897)
+at $5.7\times$ lower mean latency (0.03\,ms vs.\ 0.17\,ms), making it the preferred index
+for deployment. IVF-PQ reduces the index size by 96\% (11.7\,MB to 0.5\,MB) at the cost of
+6.4\% R@10, a favourable tradeoff when scaling to millions of entities~\cite{johnson2021faiss}.
+All indices build in under one second on 11,974 entities; at this scale exact search is
+already fast because the full index fits in CPU cache.
+
+\begin{table}[h]
+\centering
+\caption{FAISS index ablation (same model checkpoint).}
+\label{tab:faiss}
+\begin{tabular}{lrrrr}
+\toprule
+Index & R@1 & R@10 & Latency (ms) & Size \\
+\midrule
+FlatIP (exact) & 0.711 & 0.897 & 0.17 & 11.7\,MB \\
+IVF-Flat       & 0.703 & 0.878 & 0.03 & 11.9\,MB \\
+\textbf{HNSW}  & \textbf{0.711} & \textbf{0.896} & \textbf{0.03} & 14.8\,MB \\
+IVF-PQ         & 0.604 & 0.833 & 0.06 & 0.5\,MB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Limitations}
+
+The primary limitation is romanization ambiguity for CJK scripts: Chinese and Korean names
+have multiple valid romanizations across dialects and conventions, producing inconsistent
+training signal that the model cannot fully resolve. A second limitation is dataset
+composition---99.5\% of positive pairs are LLM-generated, so evaluation quality is coupled
+to the quality of LLM transliteration. Finally, evaluation is closed-world (corpus = test
+entities only); real-world retrieval over millions of entities would yield lower absolute
+numbers due to increased distractor density.
 
 \section{Concluding Remarks}
 
+We presented a byte-level contrastive encoder for cross-script phonetic name retrieval,
+trained from scratch without any pretrained multilingual backbone. Operating directly on
+raw UTF-8 bytes, the model requires no tokeniser, no script detection, and no
+language-specific preprocessing, yet achieves 0.775 MRR and 0.897 R@10 on a benchmark
+spanning 8 non-Latin scripts---outperforming the strongest baseline (Transliterate) by
+37\% and reducing the R@10 script gap from 0.93 to 0.098, a $10\times$ improvement.
+
+The results confirm that byte-level tokenization provides a sufficient inductive bias for
+cross-script phonetic alignment: scripts with consistent romanization conventions (Arabic,
+Russian, Hebrew, Hindi, Greek) approach near-perfect retrieval, while CJK scripts remain
+the primary open challenge due to romanization ambiguity that produces conflicting training
+signal. HNSW indexing delivers exact-search recall at $5.7\times$ lower latency, making
+the system viable for latency-sensitive deployment.
+
+Future work should address CJK ambiguity directly---either through dialect-aware
+transliteration during data generation, or by incorporating script-specific supervision
+signals. Evaluating on open-world corpora with millions of distractors would further
+establish real-world robustness.
 
 \begin{acks}
 Course project for DSAIT4050 Information Retrieval, Q3 2025, Delft University of Technology.
@@ -197,9 +378,9 @@ The code, dataset pipeline scripts, trained model checkpoint, and evaluation scr
 
 \noindent\textbf{Vedant Vivek Jumle (5296196):} TODO
 
-\noindent\textbf{TODO Author 2:} TODO
+\noindent\textbf{Carolyn Alcaraz:} TODO
 
-\noindent\textbf{TODO Author 3:} TODO
+\noindent\textbf{Gonenc Turanli (5794765):} TODO
 
 \noindent\textbf{TODO Author 4:} TODO
 
