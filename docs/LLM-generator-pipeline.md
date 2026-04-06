@@ -1,4 +1,4 @@
-# LLM Generator Pipeline — Design Spec
+# Pipeline Design Spec
 
 **Date:** 2026-03-11
 **Project:** Cross-Script Phonetic Name Retrieval (DSAIT4050/Q3, Group 10)
@@ -7,7 +7,13 @@
 
 ## Overview
 
-A staged, resumable pipeline that takes the raw 2M-row Wikidata name dataset and produces a fully preprocessed training dataset of name identities with their positive variants (phonetic + cross-script), ready for byte-level contrastive training. No on-the-fly preprocessing during training.
+The full pipeline has three phases:
+
+1. **Data generation** — a 4-stage LLM-driven pipeline that takes the raw 2M-row Wikidata name dataset and produces a fully preprocessed training dataset
+2. **Training** — a byte-level contrastive encoder trained with InfoNCE loss and ANCE hard-negative mining
+3. **Evaluation** — FAISS-based retrieval evaluation against classical baselines
+
+This document covers all three phases.
 
 ---
 
@@ -270,5 +276,95 @@ Every stage that calls the LLM:
 2. Skips those IDs in the input
 3. Appends to output file (never overwrites)
 4. Flushes after every batch
+
+This means a crash loses at most one in-flight batch of LLM calls.
+
+---
+
+## Training — ByteLevelEncoder
+
+**Script:** `src/model/train.py`
+**Config:** `src/llm_generator_pipeline/config.yaml`
+**Input:** `data/pipeline/04_dataset.jsonl`
+**Output:** `checkpoints/best_v2/`
+
+### Architecture
+
+| Hyperparameter | Value |
+|---|---|
+| Transformer layers | 6 |
+| Attention heads | 8 |
+| Hidden dimension | 256 |
+| FFN dimension | 1024 |
+| Max input length | 256 bytes |
+| Dropout | 0.1 |
+| Vocabulary size | 256 (raw UTF-8 bytes) |
+
+Input: name → UTF-8 bytes → byte embeddings + positional embeddings → TransformerEncoder → mean pool (non-padding positions) → L2 normalize → unit vector.
+
+### Training Objective
+
+- **Loss:** InfoNCE with temperature 0.07
+- **Negatives:** In-batch negatives + ANCE-style hard negatives
+- **Hard negative schedule:**
+  - Steps 0 → `hard_negative_warmup_steps` (200): random negatives only
+  - Steps > 200: async FAISS index rebuilt periodically; `hard_negative_mix_ratio` (0.7) fraction of hard negatives per batch
+- **False negative filtering:** pairs sharing the same `entity_id` are excluded from the negative set
+- **Optimizer:** AdamW with cosine decay + linear warmup
+- **Infrastructure:** 1× V100S 32GB, ~24h on DelftBlue
+
+### Running Training
+
+```bash
+# On HPC
+sbatch slurm_train.sh
+
+# Locally
+python src/model/train.py --config src/llm_generator_pipeline/config.yaml
+```
+
+---
+
+## Evaluation
+
+**Script:** `src/eval/evaluation.py`
+**Input:** `data/pipeline/04_dataset.jsonl` (test split), `checkpoints/best_v2/`
+
+### Corpus and Query Construction
+
+- **Corpus:** canonical English anchor names, encoded to L2-normalized embeddings, stored in a FAISS FlatIP index
+- **Queries:** every positive variant in the test split is a separate query; the target is the corpus entry matching the same `entity_id`
+- **Similarity:** inner product (= cosine similarity on unit vectors)
+
+### Metrics
+
+- MRR, Recall@1, Recall@5, Recall@10, NDCG@10
+- Reported overall and broken down by query type (phonetic / script / combined) and by script
+
+### Baselines
+
+| Baseline | Implementation |
+|---|---|
+| Levenshtein | `src/eval/baselines/levenshtein.py` |
+| Double Metaphone | `src/eval/baselines/soundex.py` |
+| BM25 (char trigrams) | `src/eval/baselines/bm25.py` |
+| Transliterate (ICU) | `src/eval/baselines/transliterate.py` |
+
+### Running Evaluation
+
+```bash
+# Model evaluation
+python src/eval/evaluation.py \
+    --checkpoint checkpoints/best_v2 \
+    --dataset data/pipeline/04_dataset.jsonl \
+    --split test
+
+# FAISS index ablation (FlatIP vs IVF-Flat vs HNSW vs IVF-PQ)
+python src/eval/faiss_ablation.py \
+    --checkpoint checkpoints/best_v2 \
+    --dataset data/pipeline/04_dataset.jsonl
+```
+
+Results are written to `results/` as JSON.
 
 This means a crash loses at most one in-flight batch of LLM calls.
