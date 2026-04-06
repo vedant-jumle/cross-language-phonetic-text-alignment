@@ -12,7 +12,7 @@
 
 \begin{document}
 
-\title[Cross-Script Phonetic Name Retrieval]{Cross-Script Phonetic Name Retrieval via Byte-Level Contrastive Embeddings}
+\title[Bytes Speak All Languages: Cross-Script Name Retrieval via Contrastive Learning]{Bytes Speak All Languages: Cross-Script Name Retrieval via Contrastive Learning}
 
 \renewcommand{\shortauthors}{Jumle et al.}
 
@@ -101,7 +101,7 @@ differ in script. A sanctions screening system must match \textit{Владими
 \textit{Vladimir Putin}; a border control system must link \textit{Αλέξανδρος} to
 \textit{Alexandros} or \textit{Aleksander}. In each case the same individual is referred to,
 yet the surface forms share no characters. Classical approaches---Levenshtein edit
-distance~\cite{levenshtein1966binary,navarro2001guided}, Soundex, and BM25~\cite{robertson2009bm25}---operate
+distance~\cite{levenshtein1966binary,navarro2001guided}, double metaphone, and BM25~\cite{robertson2009bm25}---operate
 on raw character sequences and fail completely once a script boundary is crossed.
 
 Recent work has shown that even strong multilingual dense retrievers degrade significantly
@@ -140,7 +140,7 @@ recall--latency tradeoff~\cite{johnson2021faiss,malkov2020hnsw}.
 
 \noindent\textbf{Fuzzy name matching.}
 Classical name matching relies on character-level edit distance~\cite{levenshtein1966binary,navarro2001guided}
-and phonetic codes such as Soundex and Metaphone, which encode names by their approximate English
+and phonetic codes such as double metaphone and Metaphone, which encode names by their approximate English
 pronunciation. BM25~\cite{robertson2009bm25} with character $n$-grams provides a sparse retrieval
 baseline. These methods are effective within a single script but fail categorically across script
 boundaries: a Latin query and an Arabic document share no character-level overlap regardless of
@@ -395,13 +395,13 @@ The code, dataset pipeline scripts, trained model checkpoint, and evaluation scr
 
 % TODO: each group member fills in their own paragraph.
 
-\noindent\textbf{Vedant Vivek Jumle (5296196):} TODO
+\noindent\textbf{Vedant Vivek Jumle (5296196):} Worked on leading and managing the project. Worked on modeling code. Worked on running all experiments on DelftBlue. Wrote the Abstract, Intro, Related work and conclusion section.
 
-\noindent\textbf{Carolyn Alcaraz:} TODO
+\noindent\textbf{Carolyn Alcaraz (5680581):} Contributed to the implementation of the data loading pipeline for large-scale multilingual name pairs. Assisted in developing the retrieval model and contributed to the analysis and presentation of the experimental results in the report.  
 
-\noindent\textbf{Gonenc Turanli (5794765):} TODO
+\noindent\textbf{Gonenc Turanli (5794765):} Worked on implementing the step 2 of the LLM pipeline, worked on the evaluation script, worked on section 3 - Dataset of the report.
 
-\noindent\textbf{TODO Author 4:} TODO
+\noindent\textbf{Ceylin Ece (5716950):} Worked on implementing sampling and configuration components of the pipeline. Also, worked on developing baseline retrieval methods used in evaluation; these include Levenshtein, Double metaphone, transliteration, and BM25. Additionally, worked on Section 4 - Methodology of the report. 
 
 \section*{Declaration of Generative AI Usage}
 
