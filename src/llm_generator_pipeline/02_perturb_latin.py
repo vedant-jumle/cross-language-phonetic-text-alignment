@@ -7,18 +7,14 @@ import yaml
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from llm_generator_pipeline.llm_client import call_hf_batch, parse_json_response
 
-INPUT_PATH = "data/pipeline/01_sampled.jsonl"
-OUTPUT_PATH = "data/pipeline/02_perturbed_latin.jsonl"
-
-
 def load_config(path):
     with open(path, "r") as f:
         return yaml.safe_load(f)
 
-def load_processed_ids():
+def load_processed_ids(output_path):
     processed = set()
     try:
-        with open(OUTPUT_PATH, encoding="utf-8") as f:
+        with open(output_path, encoding="utf-8") as f:
             for line in f:
                 record = json.loads(line)
                 processed.add(record["entity_id"])
@@ -64,16 +60,17 @@ def parse_variants(raw: str, name: str = "") -> list:
     print(f"parse_variants failed for '{name}': {repr(raw[:200])}", file=sys.stderr)
     return []
 
-def main(config_path):
+def main(config_path, input_path, output_path, shard, n_shards):
     config = load_config(config_path)
     batch_size = config.get("batch_size", 20)
     model_id = config["hf_model_id"]
     n_perturbations = config["n_perturbations"]
 
-    processed_ids = load_processed_ids()
-    records = [r for r in read_jsonl(INPUT_PATH) if r["entity_id"] not in processed_ids]
+    processed_ids = load_processed_ids(output_path)
+    records = [r for r in read_jsonl(input_path) if r["entity_id"] not in processed_ids]
+    records = records[shard::n_shards]
 
-    with open(OUTPUT_PATH, "a", encoding="utf-8") as out:
+    with open(output_path, "a", encoding="utf-8") as out:
         for i in tqdm(range(0, len(records), batch_size), desc="Generating Latin variants"):
             batch = records[i : i + batch_size]
             prompts = [build_prompt(r["name_en"], n_perturbations) for r in batch]
@@ -92,6 +89,10 @@ def main(config_path):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config",    default="config.yaml")
+    parser.add_argument("--input",     default="data/pipeline/01_sampled.jsonl")
+    parser.add_argument("--output",    default="data/pipeline/02_perturbed_latin.jsonl")
+    parser.add_argument("--shard",     type=int, default=0)
+    parser.add_argument("--n_shards",  type=int, default=1)
     args = parser.parse_args()
-    main(args.config)
+    main(args.config, args.input, args.output, args.shard, args.n_shards)

@@ -28,11 +28,19 @@ def main():
         parser = argparse.ArgumentParser()
         parser.add_argument("--config", type=str, default="config.yaml", help="path to the config file")
         parser.add_argument("--input", type=str, default="data/names.csv", help="path to the names.csv")
+        parser.add_argument("--exclude", type=str, default=None, help="path to file with entity_ids to exclude (one per line)")
 
         args = parser.parse_args()
 
         tqdm.write("Loading dataset...")
         data = load_data(args.input)
+
+        if args.exclude:
+            with open(args.exclude, encoding="utf-8") as f:
+                exclude_ids = set(line.strip() for line in f if line.strip())
+            before = len(data)
+            data = data[~data["entity_id"].isin(exclude_ids)].copy()
+            tqdm.write(f"Excluded {before - len(data):,} existing entities. Remaining: {len(data):,}")
         tqdm.write(f"Loaded {len(data):,} rows. Filtering and bucketing...")
         data["name_en"] = data["name_en"].astype(str).str.strip()
         data = data[data["name_en"] != ""].copy()

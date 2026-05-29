@@ -13,18 +13,14 @@ load_dotenv()
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from llm_generator_pipeline.llm_client import parse_json_response
 
-INPUT_PATH = "data/pipeline/02_perturbed_latin.jsonl"
-OUTPUT_PATH = "data/pipeline/03_perturbed_scripts.jsonl"
-
-
 def load_config(path):
     with open(path, "r") as f:
         return yaml.safe_load(f)
 
-def load_processed_ids():
+def load_processed_ids(output_path):
     processed = set()
     try:
-        with open(OUTPUT_PATH, encoding="utf-8") as f:
+        with open(output_path, encoding="utf-8") as f:
             for line in f:
                 record = json.loads(line)
                 processed.add(record["entity_id"])
@@ -69,7 +65,7 @@ def transliterate_name(name: str, target_scripts: list, client: OpenAI, json_sch
     return {s: "" for s in target_scripts}
 
 
-def main(config_path):
+def main(config_path, input_path, output_path, shard, n_shards):
     config = load_config(config_path)
     target_scripts = config["target_scripts"]
 
@@ -79,8 +75,9 @@ def main(config_path):
     )
     json_schema = _make_json_schema(target_scripts)
 
-    processed_ids = load_processed_ids()
-    records = [r for r in read_jsonl(INPUT_PATH) if r["entity_id"] not in processed_ids]
+    processed_ids = load_processed_ids(output_path)
+    records = [r for r in read_jsonl(input_path) if r["entity_id"] not in processed_ids]
+    records = records[shard::n_shards]
 
     # Build flat list of (record_idx, name) pairs across all records
     pairs = []
@@ -95,7 +92,7 @@ def main(config_path):
             ex.submit(transliterate_name, name, target_scripts, client, json_schema): (rec_idx, name)
             for rec_idx, name in pairs
         }
-        with open(OUTPUT_PATH, "a", encoding="utf-8") as out:
+        with open(output_path, "a", encoding="utf-8") as out:
             completed = 0
             pending_records = {}  # rec_idx -> number of names still in flight
             for rec_idx, name in pairs:
@@ -122,6 +119,10 @@ def main(config_path):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="config.yaml")
+    parser.add_argument("--config",   default="config.yaml")
+    parser.add_argument("--input",    default="data/pipeline/02_perturbed_latin.jsonl")
+    parser.add_argument("--output",   default="data/pipeline/03_perturbed_scripts.jsonl")
+    parser.add_argument("--shard",    type=int, default=0)
+    parser.add_argument("--n_shards", type=int, default=1)
     args = parser.parse_args()
-    main(args.config)
+    main(args.config, args.input, args.output, args.shard, args.n_shards)
